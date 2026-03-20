@@ -12,14 +12,20 @@ export function useTurnActions(chatId: string) {
 
   const invalidateAfterStream = useCallback(async () => {
     const turn = useStreamStore.getState().activeTurn;
-    if (turn && (turn.phase === "done" || turn.phase === "error")) {
+    if (
+      turn &&
+      (turn.phase === "done" ||
+        turn.phase === "error" ||
+        turn.phase === "cancelled")
+    ) {
       await Promise.all([
         qc.invalidateQueries({ queryKey: queryKeys.messages.list(chatId) }),
-        qc.invalidateQueries({ queryKey: queryKeys.chats.detail(chatId) }),
         qc.invalidateQueries({ queryKey: queryKeys.chats.all }),
         qc.invalidateQueries({ queryKey: queryKeys.quota.status() }),
       ]);
-      useStreamStore.getState().clearTurn();
+      if (turn.phase !== "error") {
+        useStreamStore.getState().clearTurn();
+      }
     }
   }, [chatId, qc]);
 
@@ -28,6 +34,7 @@ export function useTurnActions(chatId: string) {
       try {
         await retryTurn(chatId, requestId);
       } catch (err) {
+        useStreamStore.getState().clearTurn();
         if (err instanceof ApiError) {
           toast.error(err.message);
         } else if (err instanceof TypeError) {
@@ -45,6 +52,7 @@ export function useTurnActions(chatId: string) {
       try {
         await editTurn(chatId, requestId, content);
       } catch (err) {
+        useStreamStore.getState().clearTurn();
         if (err instanceof ApiError) {
           toast.error(err.message);
         } else if (err instanceof TypeError) {
@@ -71,7 +79,6 @@ export function useTurnActions(chatId: string) {
       }
       await Promise.all([
         qc.invalidateQueries({ queryKey: queryKeys.messages.list(chatId) }),
-        qc.invalidateQueries({ queryKey: queryKeys.chats.detail(chatId) }),
         qc.invalidateQueries({ queryKey: queryKeys.chats.all }),
       ]);
     },

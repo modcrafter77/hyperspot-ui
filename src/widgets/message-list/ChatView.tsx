@@ -7,6 +7,8 @@ import { useTurnActions } from "@/features/turn-actions/useTurnActions";
 import { useReaction } from "@/features/turn-actions/useReaction";
 import { Loader2 } from "lucide-react";
 
+const BOTTOM_THRESHOLD = 80;
+
 type Props = { chatId: string };
 
 export function ChatView({ chatId }: Props) {
@@ -20,13 +22,46 @@ export function ChatView({ chatId }: Props) {
   const { toggleReaction } = useReaction(chatId);
 
   const scrollRef = useRef<HTMLDivElement>(null);
-  const bottomRef = useRef<HTMLDivElement>(null);
+  const stickRef = useRef(true);
 
+  const allMessages = data?.pages.flatMap((p) => p.items) ?? [];
+  const messageCount = allMessages.length;
+
+  const isNearBottom = useCallback(() => {
+    const el = scrollRef.current;
+    if (!el) return true;
+    return el.scrollHeight - el.scrollTop - el.clientHeight < BOTTOM_THRESHOLD;
+  }, []);
+
+  const snapToBottom = useCallback(() => {
+    const el = scrollRef.current;
+    if (el) el.scrollTop = el.scrollHeight;
+  }, []);
+
+  const handleScroll = useCallback(() => {
+    stickRef.current = isNearBottom();
+  }, [isNearBottom]);
+
+  // Scroll to bottom when new messages appear (optimistic or fetched)
   useEffect(() => {
-    if (isActive) {
-      bottomRef.current?.scrollIntoView({ behavior: "smooth" });
-    }
-  }, [isActive, turn?.partialText]);
+    snapToBottom();
+    stickRef.current = true;
+  }, [messageCount, snapToBottom]);
+
+  // During streaming, run a rAF loop that pins scroll to bottom.
+  // Cheaper than reacting to every partialText change and avoids
+  // competing smooth-scroll animations.
+  useEffect(() => {
+    if (!isActive) return;
+
+    let frameId: number;
+    const tick = () => {
+      if (stickRef.current) snapToBottom();
+      frameId = requestAnimationFrame(tick);
+    };
+    frameId = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(frameId);
+  }, [isActive, snapToBottom]);
 
   const observer = useRef<IntersectionObserver | null>(null);
   const topSentinelRef = useCallback(
@@ -43,7 +78,6 @@ export function ChatView({ chatId }: Props) {
     [isFetchingNextPage, hasNextPage, fetchNextPage],
   );
 
-  const allMessages = data?.pages.flatMap((p) => p.items) ?? [];
   const streamingMsgId = isActive ? turn?.assistantMessageId : null;
   const messages = allMessages
     .filter((m) => m.id !== streamingMsgId)
@@ -78,7 +112,11 @@ export function ChatView({ chatId }: Props) {
   }
 
   return (
-    <div ref={scrollRef} className="flex h-full flex-col overflow-y-auto">
+    <div
+      ref={scrollRef}
+      onScroll={handleScroll}
+      className="flex h-full flex-col overflow-y-auto"
+    >
       <div ref={topSentinelRef} className="h-1 flex-shrink-0" />
       {isFetchingNextPage && (
         <div className="flex justify-center py-3">
@@ -104,10 +142,10 @@ export function ChatView({ chatId }: Props) {
           </Fragment>
         ))}
 
-        <StreamingBubble chatId={chatId} />
+        <StreamingBubble chatId={chatId} onRetry={handleRetry} />
       </div>
 
-      <div ref={bottomRef} className="h-4 flex-shrink-0" />
+      <div className="h-4 flex-shrink-0" />
     </div>
   );
 }

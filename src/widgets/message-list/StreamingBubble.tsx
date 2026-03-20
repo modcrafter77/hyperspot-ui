@@ -1,4 +1,5 @@
 import { useStreamStore, type ActiveTurn } from "@/features/stream-response/stream-store";
+import { mapSseError, type ErrorUiInfo } from "@/shared/lib/error-messages";
 import { cn } from "@/shared/lib/cn";
 import {
   Bot,
@@ -6,16 +7,19 @@ import {
   FileSearch,
   Globe,
   AlertCircle,
-  ArrowDownRight,
+  AlertTriangle,
+  Info,
   WifiOff,
+  RotateCcw,
+  Timer,
 } from "lucide-react";
 import Markdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import rehypeHighlight from "rehype-highlight";
 
-type Props = { chatId: string };
+type Props = { chatId: string; onRetry?: (requestId: string) => void };
 
-export function StreamingBubble({ chatId }: Props) {
+export function StreamingBubble({ chatId, onRetry }: Props) {
   const turn = useStreamStore((s) => s.activeTurn);
 
   if (!turn || turn.chatId !== chatId) return null;
@@ -28,8 +32,12 @@ export function StreamingBubble({ chatId }: Props) {
       </div>
       <div className="min-w-0 max-w-[85%] space-y-2">
         <ToolIndicators turn={turn} />
-        <ContentBlock turn={turn} />
-        <StatusLine turn={turn} />
+        <ContentBlock turn={turn} onRetry={onRetry} />
+        {turn.phase === "cancelled" && (
+          <span className="text-[11px] text-muted-foreground">
+            Generation cancelled
+          </span>
+        )}
       </div>
     </div>
   );
@@ -38,28 +46,33 @@ export function StreamingBubble({ chatId }: Props) {
 function ToolIndicators({ turn }: { turn: ActiveTurn }) {
   if (turn.tools.length === 0) return null;
 
+  const turnEnded =
+    turn.phase === "cancelled" ||
+    turn.phase === "done" ||
+    turn.phase === "error";
+
   return (
     <div className="flex flex-wrap gap-1.5">
       {turn.tools.map((tool, i) => {
         const Icon = tool.name === "web_search" ? Globe : FileSearch;
-        const isDone = tool.phase === "done";
+        const stillRunning = tool.phase !== "done" && !turnEnded;
         return (
           <span
             key={`${tool.name}-${i}`}
             className={cn(
               "inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-[11px]",
-              isDone
-                ? "bg-muted text-muted-foreground"
-                : "bg-primary/10 text-primary",
+              stillRunning
+                ? "bg-primary/10 text-primary"
+                : "bg-muted text-muted-foreground",
             )}
           >
-            {isDone ? (
-              <Icon className="h-3 w-3" />
-            ) : (
+            {stillRunning ? (
               <Loader2 className="h-3 w-3 animate-spin" />
+            ) : (
+              <Icon className="h-3 w-3" />
             )}
             {tool.name === "file_search" ? "Searching files" : "Searching web"}
-            {isDone && tool.details?.files_searched != null && (
+            {tool.phase === "done" && tool.details?.files_searched != null && (
               <span className="text-muted-foreground">
                 ({tool.details.files_searched} files)
               </span>
@@ -71,7 +84,13 @@ function ToolIndicators({ turn }: { turn: ActiveTurn }) {
   );
 }
 
-function ContentBlock({ turn }: { turn: ActiveTurn }) {
+function ContentBlock({
+  turn,
+  onRetry,
+}: {
+  turn: ActiveTurn;
+  onRetry?: (requestId: string) => void;
+}) {
   if (turn.phase === "opening") {
     return (
       <div className="rounded-lg bg-card px-3.5 py-2.5">
@@ -81,21 +100,8 @@ function ContentBlock({ turn }: { turn: ActiveTurn }) {
   }
 
   if (turn.phase === "error" && turn.errorData) {
-    return (
-      <div className="rounded-lg border border-destructive/30 bg-destructive/5 px-3.5 py-2.5">
-        <div className="flex items-start gap-2">
-          <AlertCircle className="mt-0.5 h-4 w-4 flex-shrink-0 text-destructive" />
-          <div className="text-sm">
-            <p className="font-medium text-destructive">
-              {turn.errorData.code || "Error"}
-            </p>
-            <p className="mt-0.5 text-xs text-muted-foreground">
-              {turn.errorData.message}
-            </p>
-          </div>
-        </div>
-      </div>
-    );
+    const info = mapSseError(turn.errorData);
+    return <ErrorBlock info={info} requestId={turn.requestId} onRetry={onRetry} />;
   }
 
   if (turn.phase === "recovering") {
@@ -110,7 +116,7 @@ function ContentBlock({ turn }: { turn: ActiveTurn }) {
         )}
         <div className="mt-2 flex items-center gap-1.5 text-xs text-warning">
           <WifiOff className="h-3.5 w-3.5" />
-          Reconnecting...
+          Connection lost — attempting to recover...
         </div>
       </div>
     );
@@ -138,34 +144,51 @@ function ContentBlock({ turn }: { turn: ActiveTurn }) {
   );
 }
 
-function StatusLine({ turn }: { turn: ActiveTurn }) {
-  if (turn.phase === "done" && turn.doneData) {
-    const d = turn.doneData;
-    return (
-      <div className="flex flex-wrap items-center gap-2 text-[11px] text-muted-foreground">
-        {d.usage && (
-          <span>
-            {d.usage.input_tokens}→{d.usage.output_tokens} tokens
-          </span>
-        )}
-        <span>{d.effective_model}</span>
-        {d.quota_decision === "downgrade" && (
-          <span className="inline-flex items-center gap-0.5 text-warning">
-            <ArrowDownRight className="h-3 w-3" />
-            Downgraded from {d.downgrade_from}
-          </span>
-        )}
+function ErrorBlock({
+  info,
+  requestId,
+  onRetry,
+}: {
+  info: ErrorUiInfo;
+  requestId: string;
+  onRetry?: (requestId: string) => void;
+}) {
+  const SeverityIcon =
+    info.severity === "warning"
+      ? AlertTriangle
+      : info.severity === "info"
+        ? Info
+        : info.category === "infrastructure"
+          ? Timer
+          : AlertCircle;
+
+  const borderClass =
+    info.severity === "warning"
+      ? "border-warning/30 bg-warning/5"
+      : "border-destructive/30 bg-destructive/5";
+
+  const titleClass =
+    info.severity === "warning" ? "text-warning" : "text-destructive";
+
+  return (
+    <div className={cn("rounded-lg border px-3.5 py-2.5", borderClass)}>
+      <div className="flex items-start gap-2">
+        <SeverityIcon className={cn("mt-0.5 h-4 w-4 flex-shrink-0", titleClass)} />
+        <div className="min-w-0 flex-1 text-sm">
+          <p className={cn("font-medium", titleClass)}>{info.title}</p>
+          <p className="mt-0.5 text-xs text-muted-foreground">{info.detail}</p>
+          {info.retryable && onRetry && (
+            <button
+              onClick={() => onRetry(requestId)}
+              className="mt-2 inline-flex items-center gap-1 rounded-md bg-secondary px-2.5 py-1 text-xs font-medium text-foreground hover:bg-secondary/80 transition-colors"
+            >
+              <RotateCcw className="h-3 w-3" />
+              Retry
+            </button>
+          )}
+        </div>
       </div>
-    );
-  }
-
-  if (turn.phase === "cancelled") {
-    return (
-      <span className="text-[11px] text-muted-foreground">
-        Generation cancelled
-      </span>
-    );
-  }
-
-  return null;
+    </div>
+  );
 }
+

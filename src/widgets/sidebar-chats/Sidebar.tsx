@@ -5,28 +5,31 @@ import { Search, Plus, Loader2, Pencil, Trash2, MoreHorizontal } from "lucide-re
 import { cn } from "@/shared/lib/cn";
 import { QuotaSummary } from "@/widgets/quota-panel/QuotaSummary";
 import { ErrorBoundary } from "@/shared/ui/ErrorBoundary";
-import { NewChatDialog } from "@/features/create-chat/NewChatDialog";
 import { RenameChatDialog } from "@/features/rename-chat/RenameChatDialog";
 import { DeleteChatDialog } from "@/features/delete-chat/DeleteChatDialog";
 import { formatDistanceToNow } from "date-fns";
 
 export function Sidebar() {
-  const [newChatOpen, setNewChatOpen] = useState(false);
+  const selectChat = useAppStore((s) => s.selectChat);
+
+  const handleNewChat = useCallback(() => {
+    selectChat(null);
+  }, [selectChat]);
 
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
       if ((e.ctrlKey || e.metaKey) && e.key === "n") {
         e.preventDefault();
-        setNewChatOpen(true);
+        handleNewChat();
       }
     };
     document.addEventListener("keydown", handler);
     return () => document.removeEventListener("keydown", handler);
-  }, []);
+  }, [handleNewChat]);
 
   return (
     <div className="flex h-full flex-col">
-      <SidebarHeader onNewChat={() => setNewChatOpen(true)} />
+      <SidebarHeader onNewChat={handleNewChat} />
       <Suspense fallback={<SidebarSkeleton />}>
         <ChatList />
       </Suspense>
@@ -37,8 +40,6 @@ export function Sidebar() {
           </Suspense>
         </ErrorBoundary>
       </div>
-
-      <NewChatDialog open={newChatOpen} onClose={() => setNewChatOpen(false)} />
     </div>
   );
 }

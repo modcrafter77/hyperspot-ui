@@ -1,6 +1,8 @@
 import { ApiError } from "@/shared/api";
 import { parseSseStream } from "./sse-parser";
 import { useStreamStore } from "./stream-store";
+import { mapSseError } from "@/shared/lib/error-messages";
+import { trackError } from "@/shared/lib/telemetry";
 import type { components } from "@/shared/api";
 
 type SendMessageRequest = components["schemas"]["SendMessageRequest"];
@@ -42,12 +44,9 @@ async function runSseStream(
         code: "",
       };
     }
-    const error = new ApiError(res.status, problem);
-    useStreamStore.getState().onError({
-      code: problem.code || problem.title || "",
-      message: problem.detail || problem.title || `HTTP ${res.status}`,
-    });
-    throw error;
+    // Don't call onError here — pre-stream errors are handled by the caller
+    // (sendMessage shows a toast and reverts optimistic state).
+    throw new ApiError(res.status, problem);
   }
 
   if (!res.body) {
@@ -77,9 +76,12 @@ async function runSseStream(
         case "done":
           s.onDone(event.data);
           return;
-        case "error":
+        case "error": {
+          const info = mapSseError(event.data);
+          trackError("mid_stream", event.data.code, info);
           s.onError(event.data);
           return;
+        }
       }
     }
 
@@ -99,6 +101,9 @@ export async function streamChatTurn(
   chatId: string,
   body: SendMessageRequest,
 ): Promise<void> {
+  if (import.meta.env.DEV) {
+    console.debug("[stream] POST /messages:stream", { chatId, request_id: body.request_id });
+  }
   const ac = useStreamStore.getState().startTurn(chatId, body.request_id ?? "");
   return runSseStream(
     `${BASE}/v1/chats/${chatId}/messages:stream`,

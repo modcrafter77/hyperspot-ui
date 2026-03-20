@@ -1,3 +1,3 @@
 export * from "./types";
 export * from "./api";
-export * from "./queries";
+export { useQuotaStatus, useQuotaStatusSafe, useIsQuotaExhausted } from "./queries";

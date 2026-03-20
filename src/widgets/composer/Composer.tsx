@@ -18,6 +18,7 @@ type Props = {
   chatId: string;
   chatModel: string;
   disabled?: boolean;
+  quotaExhausted?: boolean;
   onSend: (
     message: string,
     opts?: { webSearch?: boolean; attachmentIds?: string[] },
@@ -32,6 +33,7 @@ export function Composer({
   chatId,
   chatModel,
   disabled,
+  quotaExhausted,
   onSend,
   onCancel,
 }: Props) {
@@ -41,6 +43,7 @@ export function Composer({
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const dragCounter = useRef(0);
+  const busyRef = useRef(false);
 
   const phase = useStreamStore((s) => s.activeTurn?.phase);
   const isStreaming = phase === "opening" || phase === "streaming";
@@ -105,7 +108,8 @@ export function Composer({
   );
 
   const handleSend = useCallback(() => {
-    if (!canSend) return;
+    if (!canSend || busyRef.current) return;
+    busyRef.current = true;
     const ids = readyIds.length > 0 ? readyIds : undefined;
     onSend(text.trim(), {
       webSearch: webSearch || undefined,
@@ -115,6 +119,8 @@ export function Composer({
     if (textareaRef.current) {
       textareaRef.current.style.height = "auto";
     }
+    // Release on next tick so the React state update (isStreaming) takes over
+    queueMicrotask(() => { busyRef.current = false; });
   }, [canSend, text, webSearch, readyIds, onSend]);
 
   const handleKeyDown = (e: KeyboardEvent<HTMLTextAreaElement>) => {
@@ -286,11 +292,13 @@ export function Composer({
             )}
           </span>
           <span className="text-[11px] text-muted-foreground">
-            {isStreaming
-              ? "Generating..."
-              : hasPendingAttachments
-                ? "Waiting for attachments to process…"
-                : "Enter to send, Shift+Enter for newline"}
+            {quotaExhausted
+              ? <span className="text-destructive">Quota exhausted — sending disabled</span>
+              : isStreaming
+                ? "Generating..."
+                : hasPendingAttachments
+                  ? "Waiting for attachments to process…"
+                  : "Enter to send, Shift+Enter for newline"}
           </span>
         </div>
       </div>

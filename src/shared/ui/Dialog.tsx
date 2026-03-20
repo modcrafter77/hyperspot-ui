@@ -37,11 +37,11 @@ export function Dialog({ open, onClose, title, children, className }: Props) {
     <div
       ref={overlayRef}
       onClick={handleOverlayClick}
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm"
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 transition-opacity"
     >
       <div
         className={cn(
-          "w-full max-w-md rounded-lg border border-border bg-card p-5 shadow-xl",
+          "w-full max-w-md rounded-lg border border-border bg-card p-5 shadow-2xl",
           className,
         )}
       >

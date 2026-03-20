@@ -3,7 +3,10 @@ import { useAppStore } from "@/app/store";
 import { Sidebar } from "@/widgets/sidebar-chats/Sidebar";
 import { ChatView } from "@/widgets/message-list/ChatView";
 import { Composer } from "@/widgets/composer/Composer";
+import { OfflineBanner } from "@/widgets/offline-banner/OfflineBanner";
+import { NewChatPane } from "@/widgets/new-chat/NewChatPane";
 import { useChatDetailSafe } from "@/entities/chat";
+import { useIsQuotaExhausted } from "@/entities/quota";
 import { useSendMessage } from "@/features/send-message/useSendMessage";
 import { cn } from "@/shared/lib/cn";
 import { PanelLeftClose, PanelLeft } from "lucide-react";
@@ -27,6 +30,7 @@ export function AppShell() {
 
       {/* Main area */}
       <main className="flex min-w-0 flex-1 flex-col">
+        <OfflineBanner />
         {/* Top bar */}
         <header className="flex h-12 flex-shrink-0 items-center gap-2 border-b border-border px-3">
           <button
@@ -54,7 +58,9 @@ export function AppShell() {
             <ChatPane chatId={selectedChatId} />
           </Suspense>
         ) : (
-          <EmptyState />
+          <Suspense fallback={<NewChatSkeleton />}>
+            <NewChatPane />
+          </Suspense>
         )}
       </main>
     </div>
@@ -64,6 +70,7 @@ export function AppShell() {
 function ChatPane({ chatId }: { chatId: string }) {
   const { data: chat, isLoading } = useChatDetailSafe(chatId);
   const { send, cancel } = useSendMessage(chatId);
+  const quotaExhausted = useIsQuotaExhausted();
 
   if (isLoading && !chat) {
     return <MessagesSkeleton />;
@@ -77,6 +84,8 @@ function ChatPane({ chatId }: { chatId: string }) {
       <Composer
         chatId={chatId}
         chatModel={chat?.model ?? ""}
+        disabled={quotaExhausted}
+        quotaExhausted={quotaExhausted}
         onSend={send}
         onCancel={cancel}
       />
@@ -112,16 +121,14 @@ function MessagesSkeleton() {
   );
 }
 
-function EmptyState() {
+function NewChatSkeleton() {
   return (
     <div className="flex h-full items-center justify-center">
-      <div className="text-center">
-        <h2 className="text-lg font-medium text-muted-foreground">
-          Select a chat or create a new one
-        </h2>
-        <p className="mt-1 text-sm text-muted-foreground/60">
-          Use the sidebar to browse your conversations
-        </p>
+      <div className="w-full max-w-2xl px-4">
+        <div className="mb-8 flex justify-center">
+          <div className="h-8 w-64 animate-pulse rounded bg-muted" />
+        </div>
+        <div className="h-12 animate-pulse rounded-lg bg-muted" />
       </div>
     </div>
   );

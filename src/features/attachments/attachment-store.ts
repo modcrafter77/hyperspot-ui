@@ -85,17 +85,25 @@ export const useAttachmentStore = create<AttachmentState & AttachmentActions>(
           }
         })
         .catch((err) => {
+          const code =
+            err && typeof err === "object" && "code" in err
+              ? (err as { code: string }).code
+              : "";
+          const UPLOAD_ERRORS: Record<string, string> = {
+            quota_exceeded: "Quota exhausted — cannot upload",
+            file_too_large: "File exceeds the size limit",
+            unsupported_file_type: "This file type is not supported",
+          };
+          const message =
+            UPLOAD_ERRORS[code] ||
+            (err instanceof Error ? err.message : "Upload failed");
           set((s) => {
             const item = s.items[tempId];
             if (!item) return s;
             return {
               items: {
                 ...s.items,
-                [tempId]: {
-                  ...item,
-                  status: "failed",
-                  error: err instanceof Error ? err.message : "Upload failed",
-                },
+                [tempId]: { ...item, status: "failed", error: message },
               },
             };
           });
