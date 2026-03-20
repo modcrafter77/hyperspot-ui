@@ -4,6 +4,7 @@ import { Sidebar } from "@/widgets/sidebar-chats/Sidebar";
 import { ChatView } from "@/widgets/message-list/ChatView";
 import { Composer } from "@/widgets/composer/Composer";
 import { useChatDetail } from "@/entities/chat";
+import { useSendMessage } from "@/features/send-message/useSendMessage";
 import { cn } from "@/shared/lib/cn";
 import { PanelLeftClose, PanelLeft } from "lucide-react";
 
@@ -62,13 +63,18 @@ export function AppShell() {
 
 function ChatPane({ chatId }: { chatId: string }) {
   const { data: chat } = useChatDetail(chatId);
+  const { send, cancel } = useSendMessage(chatId);
 
   return (
     <>
       <div className="flex-1 overflow-hidden">
         <ChatView chatId={chatId} />
       </div>
-      <Composer chatModel={chat.model} />
+      <Composer
+        chatModel={chat.model}
+        onSend={send}
+        onCancel={cancel}
+      />
     </>
   );
 }

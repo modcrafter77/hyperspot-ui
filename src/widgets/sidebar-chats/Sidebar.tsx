@@ -1,16 +1,32 @@
-import { Suspense, useCallback, useRef } from "react";
+import { Suspense, useCallback, useRef, useState, useEffect } from "react";
 import { useAppStore } from "@/app/store";
-import { useChatsInfinite } from "@/entities/chat";
-import { Search, Plus, Loader2 } from "lucide-react";
+import { useChatsInfinite, type ChatDetail } from "@/entities/chat";
+import { Search, Plus, Loader2, Pencil, Trash2, MoreHorizontal } from "lucide-react";
 import { cn } from "@/shared/lib/cn";
 import { QuotaSummary } from "@/widgets/quota-panel/QuotaSummary";
 import { ErrorBoundary } from "@/shared/ui/ErrorBoundary";
+import { NewChatDialog } from "@/features/create-chat/NewChatDialog";
+import { RenameChatDialog } from "@/features/rename-chat/RenameChatDialog";
+import { DeleteChatDialog } from "@/features/delete-chat/DeleteChatDialog";
 import { formatDistanceToNow } from "date-fns";
 
 export function Sidebar() {
+  const [newChatOpen, setNewChatOpen] = useState(false);
+
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && e.key === "n") {
+        e.preventDefault();
+        setNewChatOpen(true);
+      }
+    };
+    document.addEventListener("keydown", handler);
+    return () => document.removeEventListener("keydown", handler);
+  }, []);
+
   return (
     <div className="flex h-full flex-col">
-      <SidebarHeader />
+      <SidebarHeader onNewChat={() => setNewChatOpen(true)} />
       <Suspense fallback={<SidebarSkeleton />}>
         <ChatList />
       </Suspense>
@@ -21,11 +37,13 @@ export function Sidebar() {
           </Suspense>
         </ErrorBoundary>
       </div>
+
+      <NewChatDialog open={newChatOpen} onClose={() => setNewChatOpen(false)} />
     </div>
   );
 }
 
-function SidebarHeader() {
+function SidebarHeader({ onNewChat }: { onNewChat: () => void }) {
   const filter = useAppStore((s) => s.chatSearchFilter);
   const setFilter = useAppStore((s) => s.setChatSearchFilter);
 
@@ -36,8 +54,10 @@ function SidebarHeader() {
           Chats
         </span>
         <button
+          onClick={onNewChat}
           className="rounded-md p-1.5 text-sidebar-foreground hover:bg-secondary hover:text-foreground"
-          aria-label="New chat"
+          aria-label="New chat (Ctrl+N)"
+          title="New chat (Ctrl+N)"
         >
           <Plus className="h-4 w-4" />
         </button>
@@ -60,6 +80,10 @@ function ChatList() {
   const selectedChatId = useAppStore((s) => s.selectedChatId);
   const selectChat = useAppStore((s) => s.selectChat);
   const filter = useAppStore((s) => s.chatSearchFilter);
+
+  const [menuChatId, setMenuChatId] = useState<string | null>(null);
+  const [renameChat, setRenameChat] = useState<ChatDetail | null>(null);
+  const [deleteChat, setDeleteChat] = useState<ChatDetail | null>(null);
 
   const odataFilter = filter
     ? `contains(title, '${filter.replace(/'/g, "''")}')`
@@ -96,40 +120,135 @@ function ChatList() {
   }
 
   return (
-    <div className="flex-1 overflow-y-auto px-1.5">
-      {chats.map((chat) => (
-        <button
-          key={chat.id}
-          onClick={() => selectChat(chat.id)}
-          className={cn(
-            "group flex w-full flex-col rounded-md px-2.5 py-2 text-left transition-colors",
-            selectedChatId === chat.id
-              ? "bg-secondary text-foreground"
-              : "text-sidebar-foreground hover:bg-secondary/50",
-          )}
-        >
-          <span className="truncate text-sm font-medium">
-            {chat.title || "Untitled chat"}
-          </span>
-          <span className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
-            <span className="truncate">{chat.model}</span>
-            <span>·</span>
-            <span className="flex-shrink-0">
-              {formatDistanceToNow(new Date(chat.updated_at), {
-                addSuffix: true,
-              })}
-            </span>
-          </span>
-        </button>
-      ))}
+    <>
+      <div className="flex-1 overflow-y-auto px-1.5">
+        {chats.map((chat) => (
+          <div key={chat.id} className="relative">
+            <button
+              onClick={() => selectChat(chat.id)}
+              onContextMenu={(e) => {
+                e.preventDefault();
+                setMenuChatId(menuChatId === chat.id ? null : chat.id);
+              }}
+              className={cn(
+                "group flex w-full flex-col rounded-md px-2.5 py-2 text-left transition-colors",
+                selectedChatId === chat.id
+                  ? "bg-secondary text-foreground"
+                  : "text-sidebar-foreground hover:bg-secondary/50",
+              )}
+            >
+              <div className="flex items-center justify-between gap-1">
+                <span className="truncate text-sm font-medium">
+                  {chat.title || "Untitled chat"}
+                </span>
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setMenuChatId(menuChatId === chat.id ? null : chat.id);
+                  }}
+                  className="flex-shrink-0 rounded p-0.5 opacity-0 transition-opacity hover:bg-muted group-hover:opacity-100"
+                  aria-label="Chat actions"
+                >
+                  <MoreHorizontal className="h-3.5 w-3.5" />
+                </button>
+              </div>
+              <span className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
+                <span className="truncate">{chat.model}</span>
+                <span>·</span>
+                <span className="flex-shrink-0">
+                  {formatDistanceToNow(new Date(chat.updated_at), {
+                    addSuffix: true,
+                  })}
+                </span>
+              </span>
+            </button>
 
-      {/* Infinite scroll sentinel */}
-      <div ref={sentinelRef} className="h-4" />
-      {isFetchingNextPage && (
-        <div className="flex justify-center py-2">
-          <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
-        </div>
+            {/* Dropdown menu */}
+            {menuChatId === chat.id && (
+              <ChatContextMenu
+                onRename={() => {
+                  setMenuChatId(null);
+                  setRenameChat(chat);
+                }}
+                onDelete={() => {
+                  setMenuChatId(null);
+                  setDeleteChat(chat);
+                }}
+                onClose={() => setMenuChatId(null)}
+              />
+            )}
+          </div>
+        ))}
+
+        <div ref={sentinelRef} className="h-4" />
+        {isFetchingNextPage && (
+          <div className="flex justify-center py-2">
+            <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
+          </div>
+        )}
+      </div>
+
+      {renameChat && (
+        <RenameChatDialog
+          open
+          onClose={() => setRenameChat(null)}
+          chatId={renameChat.id}
+          currentTitle={renameChat.title ?? null}
+        />
       )}
+
+      {deleteChat && (
+        <DeleteChatDialog
+          open
+          onClose={() => setDeleteChat(null)}
+          chatId={deleteChat.id}
+          chatTitle={deleteChat.title ?? null}
+        />
+      )}
+    </>
+  );
+}
+
+function ChatContextMenu({
+  onRename,
+  onDelete,
+  onClose,
+}: {
+  onRename: () => void;
+  onDelete: () => void;
+  onClose: () => void;
+}) {
+  const menuRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const handler = (e: MouseEvent) => {
+      if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
+        onClose();
+      }
+    };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, [onClose]);
+
+  return (
+    <div
+      ref={menuRef}
+      className="absolute right-1 top-1 z-10 min-w-[140px] rounded-md border border-border bg-popover py-1 shadow-lg"
+    >
+      <button
+        onClick={onRename}
+        className="flex w-full items-center gap-2 px-3 py-1.5 text-sm text-popover-foreground hover:bg-secondary"
+      >
+        <Pencil className="h-3.5 w-3.5" />
+        Rename
+      </button>
+      <button
+        onClick={onDelete}
+        className="flex w-full items-center gap-2 px-3 py-1.5 text-sm text-destructive hover:bg-secondary"
+      >
+        <Trash2 className="h-3.5 w-3.5" />
+        Delete
+      </button>
     </div>
   );
 }

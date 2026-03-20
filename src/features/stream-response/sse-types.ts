@@ -1,0 +1,49 @@
+import type { components } from "@/shared/api";
+
+export type SseStreamStarted = components["schemas"]["SseStreamStartedEvent"];
+export type SseDelta = components["schemas"]["SseDeltaEvent"];
+export type SseCitations = components["schemas"]["SseCitationsEvent"];
+export type CitationItem = components["schemas"]["CitationItem"];
+export type QuotaWarning = components["schemas"]["QuotaWarning"];
+
+// Backend actual SSE tool event — phase is only "start" | "done" (no "progress")
+export type SseTool = {
+  phase: "start" | "done";
+  name: string;
+  details?: { files_searched?: number } & Record<string, unknown>;
+};
+
+// Backend actual SSE done event — usage has no `model` field
+export type SseDone = {
+  usage: { input_tokens: number; output_tokens: number } | null;
+  effective_model: string;
+  selected_model: string;
+  quota_decision: "allow" | "downgrade";
+  downgrade_from?: string;
+  downgrade_reason?: string;
+  quota_warnings?: QuotaWarning[];
+};
+
+// Backend actual SSE error event — simple { code, message }, NOT full Problem Details
+export type SseError = {
+  code: string;
+  message: string;
+};
+
+export type SseEvent =
+  | { type: "stream_started"; data: SseStreamStarted }
+  | { type: "ping"; data: Record<string, never> }
+  | { type: "delta"; data: SseDelta }
+  | { type: "tool"; data: SseTool }
+  | { type: "citations"; data: SseCitations }
+  | { type: "done"; data: SseDone }
+  | { type: "error"; data: SseError };
+
+export type TurnPhase =
+  | "idle"
+  | "opening"
+  | "streaming"
+  | "done"
+  | "error"
+  | "cancelled"
+  | "recovering";

@@ -1,5 +1,11 @@
-import { fetchJson } from "@/shared/api";
-import type { ChatDetail, ChatsPage } from "./types";
+import { fetchJson, fetchDelete } from "@/shared/api";
+import type {
+  Chat,
+  ChatDetail,
+  ChatsPage,
+  CreateChatRequest,
+  UpdateChatRequest,
+} from "./types";
 
 export type ListChatsParams = {
   limit?: number;
@@ -18,4 +24,25 @@ export function listChats(params?: ListChatsParams): Promise<ChatsPage> {
 
 export function getChat(id: string): Promise<ChatDetail> {
   return fetchJson(`/v1/chats/${id}`);
+}
+
+export function createChat(body: CreateChatRequest): Promise<Chat> {
+  return fetchJson("/v1/chats", {
+    method: "POST",
+    body: JSON.stringify(body),
+  });
+}
+
+export function updateChatTitle(
+  id: string,
+  body: UpdateChatRequest,
+): Promise<ChatDetail> {
+  return fetchJson(`/v1/chats/${id}`, {
+    method: "PATCH",
+    body: JSON.stringify(body),
+  });
+}
+
+export function deleteChat(id: string): Promise<void> {
+  return fetchDelete(`/v1/chats/${id}`);
 }
