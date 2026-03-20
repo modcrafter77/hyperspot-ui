@@ -1,4 +1,5 @@
-import { ApiError } from "@/shared/api";
+import { ApiError, getBaseUrl } from "@/shared/api";
+import { appFetch } from "@/shared/lib/fetch";
 import { parseSseStream } from "./sse-parser";
 import { useStreamStore } from "./stream-store";
 import { mapSseError } from "@/shared/lib/error-messages";
@@ -6,11 +7,6 @@ import { trackError } from "@/shared/lib/telemetry";
 import type { components } from "@/shared/api";
 
 type SendMessageRequest = components["schemas"]["SendMessageRequest"];
-
-const BASE =
-  typeof window !== "undefined" && import.meta.env.DEV
-    ? ""
-    : import.meta.env.VITE_API_BASE_URL || "";
 
 /**
  * Opens an SSE stream, dispatching events to the stream store.
@@ -23,7 +19,7 @@ async function runSseStream(
 ): Promise<void> {
   let res: Response;
   try {
-    res = await fetch(url, { ...init, signal: ac.signal });
+    res = await appFetch(url, { ...init, signal: ac.signal });
   } catch (err) {
     if (ac.signal.aborted) return;
     useStreamStore.getState().onTransportError();
@@ -106,7 +102,7 @@ export async function streamChatTurn(
   }
   const ac = useStreamStore.getState().startTurn(chatId, body.request_id ?? "");
   return runSseStream(
-    `${BASE}/v1/chats/${chatId}/messages:stream`,
+    `${getBaseUrl()}/v1/chats/${chatId}/messages:stream`,
     {
       method: "POST",
       headers: { "Content-Type": "application/json", Accept: "text/event-stream" },
@@ -123,7 +119,7 @@ export async function retryTurn(
 ): Promise<void> {
   const ac = useStreamStore.getState().startTurn(chatId, requestId);
   return runSseStream(
-    `${BASE}/v1/chats/${chatId}/turns/${requestId}/retry`,
+    `${getBaseUrl()}/v1/chats/${chatId}/turns/${requestId}/retry`,
     {
       method: "POST",
       headers: { Accept: "text/event-stream" },
@@ -140,7 +136,7 @@ export async function editTurn(
 ): Promise<void> {
   const ac = useStreamStore.getState().startTurn(chatId, requestId);
   return runSseStream(
-    `${BASE}/v1/chats/${chatId}/turns/${requestId}`,
+    `${getBaseUrl()}/v1/chats/${chatId}/turns/${requestId}`,
     {
       method: "PATCH",
       headers: { "Content-Type": "application/json", Accept: "text/event-stream" },

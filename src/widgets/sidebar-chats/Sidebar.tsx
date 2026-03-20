@@ -1,7 +1,7 @@
-import { Suspense, useCallback, useRef, useState, useEffect } from "react";
+import { Suspense, useCallback, useEffect, useRef, useState } from "react";
 import { useAppStore } from "@/app/store";
 import { useChatsInfinite, type ChatDetail } from "@/entities/chat";
-import { Search, Plus, Loader2, Pencil, Trash2, MoreHorizontal } from "lucide-react";
+import { Search, Plus, Loader2, Pencil, Trash2, MoreHorizontal, Settings } from "lucide-react";
 import { cn } from "@/shared/lib/cn";
 import { QuotaSummary } from "@/widgets/quota-panel/QuotaSummary";
 import { ErrorBoundary } from "@/shared/ui/ErrorBoundary";
@@ -11,21 +11,11 @@ import { formatDistanceToNow } from "date-fns";
 
 export function Sidebar() {
   const selectChat = useAppStore((s) => s.selectChat);
+  const setSettingsOpen = useAppStore((s) => s.setSettingsOpen);
 
   const handleNewChat = useCallback(() => {
     selectChat(null);
   }, [selectChat]);
-
-  useEffect(() => {
-    const handler = (e: KeyboardEvent) => {
-      if ((e.ctrlKey || e.metaKey) && e.key === "n") {
-        e.preventDefault();
-        handleNewChat();
-      }
-    };
-    document.addEventListener("keydown", handler);
-    return () => document.removeEventListener("keydown", handler);
-  }, [handleNewChat]);
 
   return (
     <div className="flex h-full flex-col">
@@ -39,6 +29,16 @@ export function Sidebar() {
             <QuotaSummary />
           </Suspense>
         </ErrorBoundary>
+      </div>
+      <div className="border-t border-sidebar-border px-3 py-2">
+        <button
+          onClick={() => setSettingsOpen(true)}
+          className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-xs text-sidebar-foreground hover:bg-secondary hover:text-foreground"
+          aria-label="Settings"
+        >
+          <Settings className="h-3.5 w-3.5" />
+          Settings
+        </button>
       </div>
     </div>
   );

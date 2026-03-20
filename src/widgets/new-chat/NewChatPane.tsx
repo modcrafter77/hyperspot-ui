@@ -15,6 +15,7 @@ import { sendMessage } from "@/features/send-message/sendMessage";
 import { toast } from "sonner";
 import { ApiError } from "@/shared/api";
 import { mapApiError } from "@/shared/lib/error-messages";
+import { useWindowTitle } from "@/shared/hooks/useWindowTitle";
 import { cn } from "@/shared/lib/cn";
 import {
   SendHorizonal,
@@ -27,6 +28,7 @@ import {
 import type { Model } from "@/entities/model";
 
 export function NewChatPane() {
+  useWindowTitle(null);
   const { data: modelList } = useModels();
   const models = modelList.items;
 
@@ -65,7 +67,7 @@ export function NewChatPane() {
       // redundant fetches on mount.
       qc.setQueryData(queryKeys.chats.detail(chat.id), chat);
       qc.setQueryData(queryKeys.messages.list(chat.id), {
-        pages: [{ items: [], page_info: { has_more: false, next_cursor: null } }],
+        pages: [{ items: [], page_info: { limit: 20, next_cursor: null } }],
         pageParams: [undefined],
       });
 

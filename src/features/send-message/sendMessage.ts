@@ -37,7 +37,7 @@ export async function sendMessage(
     (old) => {
       if (!old) {
         return {
-          pages: [{ items: [optimisticMsg], page_info: { has_more: false, next_cursor: null } }],
+          pages: [{ items: [optimisticMsg], page_info: { limit: 20, next_cursor: null } }],
           pageParams: [undefined],
         };
       }
@@ -121,9 +121,17 @@ export async function sendMessage(
           description: d.downgrade_reason ?? "Quota limit reached",
         });
       }
-      d.quota_warnings?.forEach((w) => {
-        toast.warning(`${w.tier} ${w.period}: ${w.remaining_percentage}% remaining`);
-      });
+      d.quota_warnings
+        ?.filter((w) => w.warning || w.exhausted)
+        .forEach((w) => {
+          if (w.exhausted) {
+            toast.error(`${w.tier} ${w.period} quota exhausted`);
+          } else {
+            toast.warning(
+              `${w.tier} ${w.period} quota: ${w.remaining_percentage}% remaining`,
+            );
+          }
+        });
     }
 
     await Promise.all([

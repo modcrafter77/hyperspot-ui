@@ -1,4 +1,5 @@
 import type { components } from "./schema.gen";
+import { appFetch } from "@/shared/lib/fetch";
 
 export type ErrorResponse = components["schemas"]["ErrorResponse"];
 
@@ -27,6 +28,10 @@ export function configureApi(opts: {
   getAccessToken = opts.getAccessToken ?? null;
 }
 
+export function getBaseUrl(): string {
+  return baseUrl;
+}
+
 function authHeaders(): Record<string, string> {
   const token = getAccessToken?.();
   return token ? { Authorization: `Bearer ${token}` } : {};
@@ -37,7 +42,7 @@ export async function fetchJson<T>(
   init?: RequestInit,
 ): Promise<T> {
   const url = `${baseUrl}${path}`;
-  const res = await fetch(url, {
+  const res = await appFetch(url, {
     ...init,
     headers: {
       "Content-Type": "application/json",
@@ -70,7 +75,7 @@ export async function fetchJson<T>(
 
 export async function fetchDelete(path: string): Promise<void> {
   const url = `${baseUrl}${path}`;
-  const res = await fetch(url, {
+  const res = await appFetch(url, {
     method: "DELETE",
     headers: { ...authHeaders() },
   });
@@ -101,7 +106,7 @@ export async function uploadFile<T>(
   const form = new FormData();
   form.append("file", file);
 
-  const res = await fetch(url, {
+  const res = await appFetch(url, {
     method: "POST",
     headers: { ...authHeaders() },
     body: form,
@@ -126,5 +131,3 @@ export async function uploadFile<T>(
 
   return res.json();
 }
-
-export { baseUrl as getBaseUrl };

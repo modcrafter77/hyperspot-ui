@@ -2,6 +2,7 @@ import { Component, type ErrorInfo, type ReactNode } from "react";
 import { QueryClient } from "@tanstack/react-query";
 import { ApiError } from "@/shared/api";
 import { mapApiError } from "@/shared/lib/error-messages";
+import { useAppStore } from "@/app/store";
 
 type Props = {
   children: ReactNode;
@@ -10,8 +11,22 @@ type Props = {
 };
 type State = { error: Error | null };
 
+let resetBoundary: (() => void) | null = null;
+
+export function retryAfterSettings() {
+  resetBoundary?.();
+}
+
 export class ErrorBoundary extends Component<Props, State> {
   state: State = { error: null };
+
+  componentDidMount() {
+    resetBoundary = this.handleRetry;
+  }
+
+  componentWillUnmount() {
+    if (resetBoundary === this.handleRetry) resetBoundary = null;
+  }
 
   static getDerivedStateFromError(error: Error) {
     return { error };
@@ -19,6 +34,24 @@ export class ErrorBoundary extends Component<Props, State> {
 
   componentDidCatch(error: Error, info: ErrorInfo) {
     console.error("[ErrorBoundary]", error, info.componentStack);
+    try {
+      const detail = [
+        `Time: ${new Date().toISOString()}`,
+        `Type: ${typeof error}`,
+        `Constructor: ${error?.constructor?.name}`,
+        `Name: ${error?.name}`,
+        `Message: ${error?.message}`,
+        `Stack: ${error?.stack}`,
+        `JSON: ${JSON.stringify(error)}`,
+        `String: ${String(error)}`,
+        `Component: ${info.componentStack}`,
+      ].join("\n");
+      import("@tauri-apps/plugin-store").then(({ load }) =>
+        load("crash-log.json", { autoSave: true, defaults: {} }).then((s) =>
+          s.set("last_error", detail),
+        ),
+      ).catch(() => {});
+    } catch {}
   }
 
   handleRetry = () => {
@@ -26,6 +59,10 @@ export class ErrorBoundary extends Component<Props, State> {
       this.props.queryClient.resetQueries();
     }
     this.setState({ error: null });
+  };
+
+  handleOpenSettings = () => {
+    useAppStore.getState().setSettingsOpen(true);
   };
 
   render() {
@@ -40,6 +77,13 @@ export class ErrorBoundary extends Component<Props, State> {
         const info = mapApiError(err);
         title = info.title;
         detail = info.detail;
+      } else if (
+        err instanceof TypeError ||
+        /fetch|network|load failed|failed to fetch/i.test(err.message)
+      ) {
+        title = "Cannot connect to server";
+        detail =
+          "Check that the server URL is correct and the backend is running.";
       }
 
       return (
@@ -47,12 +91,25 @@ export class ErrorBoundary extends Component<Props, State> {
           <div className="max-w-md space-y-4 text-center">
             <h2 className="text-xl font-semibold">{title}</h2>
             <p className="text-sm text-muted-foreground">{detail}</p>
-            <button
-              onClick={this.handleRetry}
-              className="rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90"
-            >
-              Try again
-            </button>
+            <p className="break-all font-mono text-xs text-muted-foreground/60">
+              {err instanceof Error
+                ? `${err.name}: ${err.message}`
+                : `[${typeof err}] ${JSON.stringify(err) ?? String(err)}`}
+            </p>
+            <div className="flex items-center justify-center gap-3">
+              <button
+                onClick={this.handleOpenSettings}
+                className="rounded-md border border-border px-4 py-2 text-sm font-medium text-foreground hover:bg-secondary"
+              >
+                Settings
+              </button>
+              <button
+                onClick={this.handleRetry}
+                className="rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90"
+              >
+                Try again
+              </button>
+            </div>
           </div>
         </div>
       );
