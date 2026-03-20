@@ -3,6 +3,7 @@ import { useQueryClient, type InfiniteData } from "@tanstack/react-query";
 import { queryKeys } from "@/shared/lib/query-keys";
 import { streamChatTurn } from "@/features/stream-response/stream-client";
 import { useStreamStore } from "@/features/stream-response/stream-store";
+import { useAttachmentStore } from "@/features/attachments/attachment-store";
 import { toast } from "sonner";
 import { ApiError } from "@/shared/api";
 import type { MessagesPage, Message } from "@/entities/message";
@@ -11,10 +12,13 @@ export function useSendMessage(chatId: string) {
   const qc = useQueryClient();
 
   const send = useCallback(
-    async (content: string, opts?: { webSearch?: boolean }) => {
+    async (
+      content: string,
+      opts?: { webSearch?: boolean; attachmentIds?: string[] },
+    ) => {
       const requestId = crypto.randomUUID();
+      const attachmentIds = opts?.attachmentIds;
 
-      // Optimistic: inject user message into cache immediately
       const optimisticMsg: Message = {
         id: `optimistic-${requestId}`,
         request_id: requestId,
@@ -44,27 +48,38 @@ export function useSendMessage(chatId: string) {
         },
       );
 
+      if (attachmentIds && attachmentIds.length > 0) {
+        useAttachmentStore.getState().clearChat(chatId);
+      }
+
       try {
         await streamChatTurn(chatId, {
           content,
           request_id: requestId,
+          attachment_ids: attachmentIds,
           web_search: opts?.webSearch ? { enabled: true } : undefined,
         });
       } catch (err) {
         if (err instanceof ApiError) {
           toast.error(err.message);
+        } else if (err instanceof TypeError) {
+          toast.error("Network error — is the backend running?");
         }
-      } finally {
-        const turn = useStreamStore.getState().activeTurn;
-        if (turn && (turn.phase === "done" || turn.phase === "error")) {
-          await Promise.all([
-            qc.invalidateQueries({ queryKey: queryKeys.messages.list(chatId) }),
-            qc.invalidateQueries({ queryKey: queryKeys.chats.detail(chatId) }),
-            qc.invalidateQueries({ queryKey: queryKeys.chats.all }),
-            qc.invalidateQueries({ queryKey: queryKeys.quota.status() }),
-          ]);
-          useStreamStore.getState().clearTurn();
-        }
+        return;
+      }
+
+      // Only invalidate after a successful stream (done) or a server-side
+      // SSE error (the server DID process the request, so cache is stale).
+      // Transport errors (network down) mean nothing changed on the server.
+      const turn = useStreamStore.getState().activeTurn;
+      if (turn && (turn.phase === "done" || turn.phase === "error")) {
+        await Promise.all([
+          qc.invalidateQueries({ queryKey: queryKeys.messages.list(chatId) }),
+          qc.invalidateQueries({ queryKey: queryKeys.chats.detail(chatId) }),
+          qc.invalidateQueries({ queryKey: queryKeys.chats.all }),
+          qc.invalidateQueries({ queryKey: queryKeys.quota.status() }),
+        ]);
+        useStreamStore.getState().clearTurn();
       }
     },
     [chatId, qc],

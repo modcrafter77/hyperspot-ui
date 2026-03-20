@@ -1,5 +1,6 @@
 import {
   useInfiniteQuery,
+  useQuery,
   useSuspenseQuery,
   type InfiniteData,
 } from "@tanstack/react-query";
@@ -29,5 +30,14 @@ export function useChatDetail(chatId: string) {
   return useSuspenseQuery({
     queryKey: queryKeys.chats.detail(chatId),
     queryFn: () => getChat(chatId),
+  });
+}
+
+/** Non-suspense variant — returns stale data on refetch failure instead of crashing. */
+export function useChatDetailSafe(chatId: string) {
+  return useQuery({
+    queryKey: queryKeys.chats.detail(chatId),
+    queryFn: () => getChat(chatId),
+    enabled: !!chatId,
   });
 }

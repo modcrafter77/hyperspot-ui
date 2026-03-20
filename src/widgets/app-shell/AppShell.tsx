@@ -3,7 +3,7 @@ import { useAppStore } from "@/app/store";
 import { Sidebar } from "@/widgets/sidebar-chats/Sidebar";
 import { ChatView } from "@/widgets/message-list/ChatView";
 import { Composer } from "@/widgets/composer/Composer";
-import { useChatDetail } from "@/entities/chat";
+import { useChatDetailSafe } from "@/entities/chat";
 import { useSendMessage } from "@/features/send-message/useSendMessage";
 import { cn } from "@/shared/lib/cn";
 import { PanelLeftClose, PanelLeft } from "lucide-react";
@@ -62,8 +62,12 @@ export function AppShell() {
 }
 
 function ChatPane({ chatId }: { chatId: string }) {
-  const { data: chat } = useChatDetail(chatId);
+  const { data: chat, isLoading } = useChatDetailSafe(chatId);
   const { send, cancel } = useSendMessage(chatId);
+
+  if (isLoading && !chat) {
+    return <MessagesSkeleton />;
+  }
 
   return (
     <>
@@ -71,7 +75,8 @@ function ChatPane({ chatId }: { chatId: string }) {
         <ChatView chatId={chatId} />
       </div>
       <Composer
-        chatModel={chat.model}
+        chatId={chatId}
+        chatModel={chat?.model ?? ""}
         onSend={send}
         onCancel={cancel}
       />

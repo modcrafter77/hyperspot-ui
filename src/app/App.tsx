@@ -16,7 +16,7 @@ const queryClient = new QueryClient({
 export function App() {
   return (
     <QueryClientProvider client={queryClient}>
-      <ErrorBoundary>
+      <ErrorBoundary queryClient={queryClient}>
         <AppShell />
         <Toaster
           position="bottom-right"

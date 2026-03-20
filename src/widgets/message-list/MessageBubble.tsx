@@ -1,10 +1,20 @@
 import type { Message } from "@/entities/message";
+import type { components } from "@/shared/api";
 import { cn } from "@/shared/lib/cn";
-import { User, Bot, ThumbsUp, ThumbsDown, Paperclip } from "lucide-react";
+import {
+  User,
+  Bot,
+  ThumbsUp,
+  ThumbsDown,
+  FileText,
+  ImageIcon,
+  AlertCircle,
+} from "lucide-react";
 import Markdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import rehypeHighlight from "rehype-highlight";
 
+type AttachmentSummary = components["schemas"]["AttachmentSummary"];
 type Props = { message: Message };
 
 export function MessageBubble({ message }: Props) {
@@ -18,7 +28,6 @@ export function MessageBubble({ message }: Props) {
         isUser && "flex-row-reverse",
       )}
     >
-      {/* Avatar */}
       <div
         className={cn(
           "flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-full",
@@ -27,24 +36,20 @@ export function MessageBubble({ message }: Props) {
             : "bg-muted text-muted-foreground",
         )}
       >
-        {isUser ? <User className="h-3.5 w-3.5" /> : <Bot className="h-3.5 w-3.5" />}
+        {isUser ? (
+          <User className="h-3.5 w-3.5" />
+        ) : (
+          <Bot className="h-3.5 w-3.5" />
+        )}
       </div>
 
-      {/* Content */}
       <div className={cn("min-w-0 max-w-[85%] space-y-2", isUser && "text-right")}>
         {/* Attachments */}
         {message.attachments.length > 0 && (
-          <div className={cn("flex flex-wrap gap-1.5", isUser && "justify-end")}>
-            {message.attachments.map((a) => (
-              <span
-                key={a.attachment_id}
-                className="inline-flex items-center gap-1 rounded-md bg-muted px-2 py-0.5 text-[11px] text-muted-foreground"
-              >
-                <Paperclip className="h-3 w-3" />
-                <span className="max-w-[120px] truncate">{a.filename}</span>
-              </span>
-            ))}
-          </div>
+          <AttachmentRow
+            attachments={message.attachments}
+            alignRight={isUser}
+          />
         )}
 
         {/* Message text */}
@@ -58,7 +63,10 @@ export function MessageBubble({ message }: Props) {
         >
           {isAssistant ? (
             <div className="prose prose-invert prose-sm max-w-none">
-              <Markdown remarkPlugins={[remarkGfm]} rehypePlugins={[rehypeHighlight]}>
+              <Markdown
+                remarkPlugins={[remarkGfm]}
+                rehypePlugins={[rehypeHighlight]}
+              >
                 {message.content}
               </Markdown>
             </div>
@@ -74,9 +82,7 @@ export function MessageBubble({ message }: Props) {
             isUser && "justify-end",
           )}
         >
-          {isAssistant && message.model && (
-            <span>{message.model}</span>
-          )}
+          {isAssistant && message.model && <span>{message.model}</span>}
           {isAssistant && message.input_tokens != null && (
             <span>
               {message.input_tokens}→{message.output_tokens} tokens
@@ -89,7 +95,98 @@ export function MessageBubble({ message }: Props) {
   );
 }
 
-function ReactionBadge({ reaction }: { reaction: "like" | "dislike" | null }) {
+function AttachmentRow({
+  attachments,
+  alignRight,
+}: {
+  attachments: AttachmentSummary[];
+  alignRight: boolean;
+}) {
+  const images = attachments.filter((a) => a.kind === "image");
+  const docs = attachments.filter((a) => a.kind === "document");
+
+  return (
+    <div className={cn("space-y-1.5", alignRight && "flex flex-col items-end")}>
+      {/* Image thumbnails */}
+      {images.length > 0 && (
+        <div className={cn("flex flex-wrap gap-1.5", alignRight && "justify-end")}>
+          {images.map((img) => (
+            <ImageChip key={img.attachment_id} attachment={img} />
+          ))}
+        </div>
+      )}
+
+      {/* Document chips */}
+      {docs.length > 0 && (
+        <div className={cn("flex flex-wrap gap-1.5", alignRight && "justify-end")}>
+          {docs.map((doc) => (
+            <DocChip key={doc.attachment_id} attachment={doc} />
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function ImageChip({ attachment }: { attachment: AttachmentSummary }) {
+  const thumb = attachment.img_thumbnail;
+
+  if (thumb) {
+    return (
+      <div className="group/img relative overflow-hidden rounded-lg border border-border">
+        <img
+          src={`data:${thumb.content_type};base64,${thumb.data_base64}`}
+          alt={attachment.filename}
+          className="h-16 w-16 object-cover"
+          width={thumb.width}
+          height={thumb.height}
+        />
+        <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/60 to-transparent px-1 pb-0.5 pt-3 opacity-0 transition-opacity group-hover/img:opacity-100">
+          <span className="block truncate text-[9px] text-white">
+            {attachment.filename}
+          </span>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <span className="inline-flex items-center gap-1 rounded-md border border-border bg-muted px-2 py-1 text-[11px] text-muted-foreground">
+      {attachment.status === "failed" ? (
+        <AlertCircle className="h-3 w-3 text-destructive" />
+      ) : (
+        <ImageIcon className="h-3 w-3" />
+      )}
+      <span className="max-w-[100px] truncate">{attachment.filename}</span>
+    </span>
+  );
+}
+
+function DocChip({ attachment }: { attachment: AttachmentSummary }) {
+  return (
+    <span
+      className={cn(
+        "inline-flex items-center gap-1 rounded-md border px-2 py-1 text-[11px]",
+        attachment.status === "failed"
+          ? "border-destructive/30 bg-destructive/5 text-destructive"
+          : "border-border bg-muted text-muted-foreground",
+      )}
+    >
+      {attachment.status === "failed" ? (
+        <AlertCircle className="h-3 w-3" />
+      ) : (
+        <FileText className="h-3 w-3" />
+      )}
+      <span className="max-w-[120px] truncate">{attachment.filename}</span>
+    </span>
+  );
+}
+
+function ReactionBadge({
+  reaction,
+}: {
+  reaction: "like" | "dislike" | null;
+}) {
   if (!reaction) return null;
   return (
     <span

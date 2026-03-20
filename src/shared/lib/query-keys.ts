@@ -12,6 +12,10 @@ export const queryKeys = {
     all: ["models"] as const,
     list: () => ["models", "list"] as const,
   },
+  attachments: {
+    detail: (chatId: string, attachmentId: string) =>
+      ["attachments", chatId, attachmentId] as const,
+  },
   quota: {
     status: () => ["quota", "status"] as const,
   },

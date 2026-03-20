@@ -1,10 +1,12 @@
-import { useChatDetail } from "@/entities/chat";
+import { useChatDetailSafe } from "@/entities/chat";
 import { Bot } from "lucide-react";
 
 type Props = { chatId: string };
 
 export function ChatHeader({ chatId }: Props) {
-  const { data: chat } = useChatDetail(chatId);
+  const { data: chat } = useChatDetailSafe(chatId);
+
+  if (!chat) return null;
 
   return (
     <div className="flex items-center gap-2 overflow-hidden">
