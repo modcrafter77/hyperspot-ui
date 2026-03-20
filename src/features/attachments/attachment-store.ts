@@ -16,6 +16,8 @@ export type LocalAttachment = {
   serverData: Attachment | null;
   error: string | null;
   pollTimer: ReturnType<typeof setTimeout> | null;
+  /** Object URL for instant local image preview (revoked on remove/clear). */
+  localPreviewUrl: string | null;
 };
 
 type AttachmentState = {
@@ -42,6 +44,9 @@ export const useAttachmentStore = create<AttachmentState & AttachmentActions>(
       const tempId = `temp-${crypto.randomUUID()}`;
       const kind = IMAGE_MIMES.has(file.type) ? "image" : "document";
 
+      const localPreviewUrl =
+        kind === "image" ? URL.createObjectURL(file) : null;
+
       const entry: LocalAttachment = {
         id: tempId,
         chatId,
@@ -52,6 +57,7 @@ export const useAttachmentStore = create<AttachmentState & AttachmentActions>(
         serverData: null,
         error: null,
         pollTimer: null,
+        localPreviewUrl,
       };
 
       set((s) => ({ items: { ...s.items, [tempId]: entry } }));
@@ -101,6 +107,7 @@ export const useAttachmentStore = create<AttachmentState & AttachmentActions>(
       if (!item) return;
 
       if (item.pollTimer) clearTimeout(item.pollTimer);
+      if (item.localPreviewUrl) URL.revokeObjectURL(item.localPreviewUrl);
 
       if (item.status === "uploading" || item.status === "failed" || id.startsWith("temp-")) {
         set((s) => {
@@ -165,6 +172,7 @@ export const useAttachmentStore = create<AttachmentState & AttachmentActions>(
       for (const [k, v] of Object.entries(items)) {
         if (v.chatId === chatId) {
           if (v.pollTimer) clearTimeout(v.pollTimer);
+          if (v.localPreviewUrl) URL.revokeObjectURL(v.localPreviewUrl);
         } else {
           remaining[k] = v;
         }

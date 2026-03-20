@@ -11,29 +11,17 @@ const BASE =
     : import.meta.env.VITE_API_BASE_URL || "";
 
 /**
- * Sends a message and processes the SSE stream, dispatching events to the stream store.
- * Returns a promise that resolves when the stream terminates (done/error) or rejects on pre-stream failure.
+ * Opens an SSE stream, dispatching events to the stream store.
+ * Shared by send, retry, and edit flows.
  */
-export async function streamChatTurn(
-  chatId: string,
-  body: SendMessageRequest,
+async function runSseStream(
+  url: string,
+  init: RequestInit,
+  ac: AbortController,
 ): Promise<void> {
-  const store = useStreamStore.getState();
-  const ac = store.startTurn(chatId, body.request_id ?? "");
-
-  const url = `${BASE}/v1/chats/${chatId}/messages:stream`;
-
   let res: Response;
   try {
-    res = await fetch(url, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Accept: "text/event-stream",
-      },
-      body: JSON.stringify(body),
-      signal: ac.signal,
-    });
+    res = await fetch(url, { ...init, signal: ac.signal });
   } catch (err) {
     if (ac.signal.aborted) return;
     useStreamStore.getState().onTransportError();
@@ -55,7 +43,6 @@ export async function streamChatTurn(
       };
     }
     const error = new ApiError(res.status, problem);
-    // Normalize Problem Details to simple { code, message } for the stream store
     useStreamStore.getState().onError({
       code: problem.code || problem.title || "",
       message: problem.detail || problem.title || `HTTP ${res.status}`,
@@ -96,7 +83,6 @@ export async function streamChatTurn(
       }
     }
 
-    // Stream ended without terminal event — treat as transport error
     const current = useStreamStore.getState().activeTurn;
     if (current && current.phase === "streaming") {
       useStreamStore.getState().onTransportError();
@@ -106,4 +92,55 @@ export async function streamChatTurn(
     useStreamStore.getState().onTransportError();
     throw err;
   }
+}
+
+/** Send a new message and stream the response. */
+export async function streamChatTurn(
+  chatId: string,
+  body: SendMessageRequest,
+): Promise<void> {
+  const ac = useStreamStore.getState().startTurn(chatId, body.request_id ?? "");
+  return runSseStream(
+    `${BASE}/v1/chats/${chatId}/messages:stream`,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Accept: "text/event-stream" },
+      body: JSON.stringify(body),
+    },
+    ac,
+  );
+}
+
+/** Retry the last turn — server reuses original user message. */
+export async function retryTurn(
+  chatId: string,
+  requestId: string,
+): Promise<void> {
+  const ac = useStreamStore.getState().startTurn(chatId, requestId);
+  return runSseStream(
+    `${BASE}/v1/chats/${chatId}/turns/${requestId}/retry`,
+    {
+      method: "POST",
+      headers: { Accept: "text/event-stream" },
+    },
+    ac,
+  );
+}
+
+/** Edit the last user turn and stream a new response. */
+export async function editTurn(
+  chatId: string,
+  requestId: string,
+  content: string,
+): Promise<void> {
+  const ac = useStreamStore.getState().startTurn(chatId, requestId);
+  return runSseStream(
+    `${BASE}/v1/chats/${chatId}/turns/${requestId}`,
+    {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json", Accept: "text/event-stream" },
+      body: JSON.stringify({ content }),
+    },
+    ac,
+  );
 }

@@ -56,7 +56,7 @@ function AttachmentChip({
             : "border-border bg-card text-card-foreground",
       )}
     >
-      {/* Thumbnail or icon */}
+      {/* Thumbnail or local preview or icon */}
       {hasThumbnail ? (
         <img
           src={`data:${thumbnail.content_type};base64,${thumbnail.data_base64}`}
@@ -64,6 +64,15 @@ function AttachmentChip({
           className="h-8 w-8 rounded object-cover"
           width={thumbnail.width}
           height={thumbnail.height}
+        />
+      ) : item.localPreviewUrl ? (
+        <img
+          src={item.localPreviewUrl}
+          alt={item.filename}
+          className={cn(
+            "h-8 w-8 rounded object-cover",
+            (item.status === "uploading" || item.status === "pending") && "opacity-60",
+          )}
         />
       ) : (
         <StatusIcon item={item} />

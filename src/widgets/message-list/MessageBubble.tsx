@@ -1,3 +1,4 @@
+import { useState } from "react";
 import type { Message } from "@/entities/message";
 import type { components } from "@/shared/api";
 import { cn } from "@/shared/lib/cn";
@@ -9,17 +10,50 @@ import {
   FileText,
   ImageIcon,
   AlertCircle,
+  RotateCcw,
+  Pencil,
+  Trash2,
 } from "lucide-react";
 import Markdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import rehypeHighlight from "rehype-highlight";
 
 type AttachmentSummary = components["schemas"]["AttachmentSummary"];
-type Props = { message: Message };
 
-export function MessageBubble({ message }: Props) {
+type Props = {
+  message: Message;
+  isLastTurn?: boolean;
+  onRetry?: (requestId: string) => void;
+  onEdit?: (requestId: string, content: string) => void;
+  onDelete?: (requestId: string) => void;
+  onReaction?: (
+    messageId: string,
+    reaction: "like" | "dislike",
+    current: "like" | "dislike" | null,
+  ) => void;
+};
+
+export function MessageBubble({
+  message,
+  isLastTurn,
+  onRetry,
+  onEdit,
+  onDelete,
+  onReaction,
+}: Props) {
   const isUser = message.role === "user";
   const isAssistant = message.role === "assistant";
+  const [editing, setEditing] = useState(false);
+  const [editText, setEditText] = useState(message.content);
+
+  const canAct = isLastTurn && message.request_id;
+
+  const submitEdit = () => {
+    if (editText.trim() && message.request_id && onEdit) {
+      onEdit(message.request_id, editText.trim());
+      setEditing(false);
+    }
+  };
 
   return (
     <div
@@ -43,8 +77,12 @@ export function MessageBubble({ message }: Props) {
         )}
       </div>
 
-      <div className={cn("min-w-0 max-w-[85%] space-y-2", isUser && "text-right")}>
-        {/* Attachments */}
+      <div
+        className={cn(
+          "min-w-0 max-w-[85%] space-y-2",
+          isUser && "text-right",
+        )}
+      >
         {message.attachments.length > 0 && (
           <AttachmentRow
             attachments={message.attachments}
@@ -52,46 +90,161 @@ export function MessageBubble({ message }: Props) {
           />
         )}
 
-        {/* Message text */}
-        <div
-          className={cn(
-            "rounded-lg px-3.5 py-2.5 text-sm leading-relaxed",
-            isUser
-              ? "bg-primary text-primary-foreground"
-              : "bg-card text-card-foreground",
-          )}
-        >
-          {isAssistant ? (
-            <div className="prose prose-invert prose-sm max-w-none">
-              <Markdown
-                remarkPlugins={[remarkGfm]}
-                rehypePlugins={[rehypeHighlight]}
+        {/* Message text or edit mode */}
+        {editing ? (
+          <div className="space-y-2">
+            <textarea
+              value={editText}
+              onChange={(e) => setEditText(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" && !e.shiftKey) {
+                  e.preventDefault();
+                  submitEdit();
+                }
+                if (e.key === "Escape") setEditing(false);
+              }}
+              rows={3}
+              className="w-full resize-none rounded-lg border border-border bg-card px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-1 focus:ring-ring"
+              autoFocus
+            />
+            <div className="flex gap-1.5">
+              <button
+                onClick={submitEdit}
+                disabled={!editText.trim()}
+                className="rounded-md bg-primary px-3 py-1 text-xs font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-40"
               >
-                {message.content}
-              </Markdown>
+                Save & send
+              </button>
+              <button
+                onClick={() => {
+                  setEditing(false);
+                  setEditText(message.content);
+                }}
+                className="rounded-md px-3 py-1 text-xs text-muted-foreground hover:bg-secondary"
+              >
+                Cancel
+              </button>
             </div>
-          ) : (
-            <p className="whitespace-pre-wrap">{message.content}</p>
-          )}
-        </div>
+          </div>
+        ) : (
+          <div
+            className={cn(
+              "rounded-lg px-3.5 py-2.5 text-sm leading-relaxed",
+              isUser
+                ? "bg-primary text-primary-foreground"
+                : "bg-card text-card-foreground",
+            )}
+          >
+            {isAssistant ? (
+              <div className="prose prose-invert prose-sm max-w-none">
+                <Markdown
+                  remarkPlugins={[remarkGfm]}
+                  rehypePlugins={[rehypeHighlight]}
+                >
+                  {message.content}
+                </Markdown>
+              </div>
+            ) : (
+              <p className="whitespace-pre-wrap">{message.content}</p>
+            )}
+          </div>
+        )}
 
-        {/* Meta row */}
+        {/* Meta + action row */}
         <div
           className={cn(
-            "flex items-center gap-2 text-[11px] text-muted-foreground",
+            "flex items-center gap-1 text-[11px] text-muted-foreground",
             isUser && "justify-end",
           )}
         >
-          {isAssistant && message.model && <span>{message.model}</span>}
+          {isAssistant && message.model && (
+            <span className="mr-1">{message.model}</span>
+          )}
           {isAssistant && message.input_tokens != null && (
-            <span>
+            <span className="mr-1">
               {message.input_tokens}→{message.output_tokens} tokens
             </span>
           )}
-          {isAssistant && <ReactionBadge reaction={message.my_reaction} />}
+
+          {/* Reaction buttons for assistant messages */}
+          {isAssistant && onReaction && (
+            <>
+              <ActionBtn
+                icon={ThumbsUp}
+                active={message.my_reaction === "like"}
+                activeClass="text-green-400"
+                label="Like"
+                onClick={() =>
+                  onReaction(message.id, "like", message.my_reaction)
+                }
+              />
+              <ActionBtn
+                icon={ThumbsDown}
+                active={message.my_reaction === "dislike"}
+                activeClass="text-red-400"
+                label="Dislike"
+                onClick={() =>
+                  onReaction(message.id, "dislike", message.my_reaction)
+                }
+              />
+            </>
+          )}
+
+          {/* Turn actions — only on last turn */}
+          {canAct && isAssistant && onRetry && (
+            <ActionBtn
+              icon={RotateCcw}
+              label="Retry"
+              onClick={() => onRetry(message.request_id!)}
+            />
+          )}
+          {canAct && isUser && onEdit && !editing && (
+            <ActionBtn
+              icon={Pencil}
+              label="Edit"
+              onClick={() => setEditing(true)}
+            />
+          )}
+          {canAct && isUser && onDelete && (
+            <ActionBtn
+              icon={Trash2}
+              label="Delete turn"
+              onClick={() => onDelete(message.request_id!)}
+            />
+          )}
         </div>
       </div>
     </div>
+  );
+}
+
+function ActionBtn({
+  icon: Icon,
+  label,
+  active,
+  activeClass,
+  onClick,
+}: {
+  icon: React.ComponentType<{ className?: string }>;
+  label: string;
+  active?: boolean;
+  activeClass?: string;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      onClick={onClick}
+      className={cn(
+        "rounded p-1 transition-colors",
+        active
+          ? activeClass
+          : "text-muted-foreground opacity-0 hover:bg-secondary hover:text-foreground group-hover:opacity-100",
+      )}
+      aria-label={label}
+      title={label}
+    >
+      <Icon className="h-3 w-3" />
+    </button>
   );
 }
 
@@ -106,19 +259,31 @@ function AttachmentRow({
   const docs = attachments.filter((a) => a.kind === "document");
 
   return (
-    <div className={cn("space-y-1.5", alignRight && "flex flex-col items-end")}>
-      {/* Image thumbnails */}
+    <div
+      className={cn(
+        "space-y-1.5",
+        alignRight && "flex flex-col items-end",
+      )}
+    >
       {images.length > 0 && (
-        <div className={cn("flex flex-wrap gap-1.5", alignRight && "justify-end")}>
+        <div
+          className={cn(
+            "flex flex-wrap gap-1.5",
+            alignRight && "justify-end",
+          )}
+        >
           {images.map((img) => (
             <ImageChip key={img.attachment_id} attachment={img} />
           ))}
         </div>
       )}
-
-      {/* Document chips */}
       {docs.length > 0 && (
-        <div className={cn("flex flex-wrap gap-1.5", alignRight && "justify-end")}>
+        <div
+          className={cn(
+            "flex flex-wrap gap-1.5",
+            alignRight && "justify-end",
+          )}
+        >
           {docs.map((doc) => (
             <DocChip key={doc.attachment_id} attachment={doc} />
           ))}
@@ -178,28 +343,6 @@ function DocChip({ attachment }: { attachment: AttachmentSummary }) {
         <FileText className="h-3 w-3" />
       )}
       <span className="max-w-[120px] truncate">{attachment.filename}</span>
-    </span>
-  );
-}
-
-function ReactionBadge({
-  reaction,
-}: {
-  reaction: "like" | "dislike" | null;
-}) {
-  if (!reaction) return null;
-  return (
-    <span
-      className={cn(
-        "inline-flex items-center gap-0.5",
-        reaction === "like" ? "text-success" : "text-destructive",
-      )}
-    >
-      {reaction === "like" ? (
-        <ThumbsUp className="h-3 w-3" />
-      ) : (
-        <ThumbsDown className="h-3 w-3" />
-      )}
     </span>
   );
 }

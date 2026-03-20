@@ -71,8 +71,12 @@ export function Composer({
   );
 
   const hasReadyAttachments = readyIds.length > 0;
+  const hasPendingAttachments = attachments.some(
+    (a) => a.status === "uploading" || a.status === "pending",
+  );
   const canSend =
     (text.trim().length > 0 || hasReadyAttachments) &&
+    !hasPendingAttachments &&
     !disabled &&
     !isStreaming;
 
@@ -284,7 +288,9 @@ export function Composer({
           <span className="text-[11px] text-muted-foreground">
             {isStreaming
               ? "Generating..."
-              : "Enter to send, Shift+Enter for newline"}
+              : hasPendingAttachments
+                ? "Waiting for attachments to process…"
+                : "Enter to send, Shift+Enter for newline"}
           </span>
         </div>
       </div>
