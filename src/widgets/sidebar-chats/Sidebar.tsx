@@ -125,14 +125,17 @@ function ChatList() {
       <div className="flex-1 overflow-y-auto px-1.5">
         {chats.map((chat) => (
           <div key={chat.id} className="relative">
-            <button
+            <div
+              role="button"
+              tabIndex={0}
               onClick={() => selectChat(chat.id)}
+              onKeyDown={(e) => { if (e.key === "Enter") selectChat(chat.id); }}
               onContextMenu={(e) => {
                 e.preventDefault();
                 setMenuChatId(menuChatId === chat.id ? null : chat.id);
               }}
               className={cn(
-                "group flex w-full flex-col rounded-md px-2.5 py-2 text-left transition-colors",
+                "group flex w-full cursor-pointer flex-col rounded-md px-2.5 py-2 text-left transition-colors",
                 selectedChatId === chat.id
                   ? "bg-secondary text-foreground"
                   : "text-sidebar-foreground hover:bg-secondary/50",
@@ -162,7 +165,7 @@ function ChatList() {
                   })}
                 </span>
               </span>
-            </button>
+            </div>
 
             {/* Dropdown menu */}
             {menuChatId === chat.id && (

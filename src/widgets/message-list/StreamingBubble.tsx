@@ -1,3 +1,4 @@
+import { useState, useCallback } from "react";
 import { useStreamStore, type ActiveTurn } from "@/features/stream-response/stream-store";
 import { mapSseError, type ErrorUiInfo } from "@/shared/lib/error-messages";
 import { cn } from "@/shared/lib/cn";
@@ -12,10 +13,13 @@ import {
   WifiOff,
   RotateCcw,
   Timer,
+  Copy,
+  Check,
 } from "lucide-react";
 import Markdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import rehypeHighlight from "rehype-highlight";
+import { markdownComponents } from "@/shared/lib/markdown-components";
 
 type Props = { chatId: string; onRetry?: (requestId: string) => void };
 
@@ -30,13 +34,16 @@ export function StreamingBubble({ chatId, onRetry }: Props) {
       <div className="flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-full bg-muted text-muted-foreground">
         <Bot className="h-3.5 w-3.5" />
       </div>
-      <div className="min-w-0 max-w-[85%] space-y-2">
+      <div className="group min-w-0 max-w-[85%] space-y-2">
         <ToolIndicators turn={turn} />
         <ContentBlock turn={turn} onRetry={onRetry} />
         {turn.phase === "cancelled" && (
           <span className="text-[11px] text-muted-foreground">
             Generation cancelled
           </span>
+        )}
+        {turn.partialText && (turn.phase === "done" || turn.phase === "cancelled") && (
+          <CopyBtn text={turn.partialText} />
         )}
       </div>
     </div>
@@ -109,7 +116,7 @@ function ContentBlock({
       <div className="rounded-lg bg-card px-3.5 py-2.5">
         {turn.partialText && (
           <div className="prose prose-invert prose-sm max-w-none">
-            <Markdown remarkPlugins={[remarkGfm]} rehypePlugins={[rehypeHighlight]}>
+            <Markdown remarkPlugins={[remarkGfm]} rehypePlugins={[rehypeHighlight]} components={markdownComponents} skipHtml={false}>
               {turn.partialText}
             </Markdown>
           </div>
@@ -133,13 +140,41 @@ function ContentBlock({
   return (
     <div className="rounded-lg bg-card px-3.5 py-2.5 text-sm leading-relaxed text-card-foreground">
       <div className="prose prose-invert prose-sm max-w-none">
-        <Markdown remarkPlugins={[remarkGfm]} rehypePlugins={[rehypeHighlight]}>
+        <Markdown remarkPlugins={[remarkGfm]} rehypePlugins={[rehypeHighlight]} components={markdownComponents} skipHtml={false}>
           {turn.partialText}
         </Markdown>
       </div>
       {turn.phase === "streaming" && (
         <span className="ml-0.5 inline-block h-4 w-1.5 animate-pulse bg-foreground" />
       )}
+    </div>
+  );
+}
+
+function CopyBtn({ text }: { text: string }) {
+  const [copied, setCopied] = useState(false);
+  const handleCopy = useCallback(() => {
+    navigator.clipboard.writeText(text).then(() => {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1500);
+    });
+  }, [text]);
+
+  return (
+    <div className="flex items-center text-[11px] text-muted-foreground">
+      <button
+        onClick={handleCopy}
+        className={cn(
+          "rounded p-1 transition-colors",
+          copied
+            ? "text-green-400"
+            : "opacity-0 hover:bg-secondary hover:text-foreground group-hover:opacity-100",
+        )}
+        aria-label="Copy"
+        title="Copy"
+      >
+        {copied ? <Check className="h-3 w-3" /> : <Copy className="h-3 w-3" />}
+      </button>
     </div>
   );
 }
