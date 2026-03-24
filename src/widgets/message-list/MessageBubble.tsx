@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useCallback } from "react";
 import type { Message } from "@/entities/message";
 import type { components } from "@/shared/api";
 import { cn } from "@/shared/lib/cn";
@@ -13,10 +13,13 @@ import {
   RotateCcw,
   Pencil,
   Trash2,
+  Copy,
+  Check,
 } from "lucide-react";
 import Markdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import rehypeHighlight from "rehype-highlight";
+import { markdownComponents } from "@/shared/lib/markdown-components";
 
 type AttachmentSummary = components["schemas"]["AttachmentSummary"];
 
@@ -45,8 +48,16 @@ export function MessageBubble({
   const isAssistant = message.role === "assistant";
   const [editing, setEditing] = useState(false);
   const [editText, setEditText] = useState(message.content);
+  const [copied, setCopied] = useState(false);
 
   const canAct = isLastTurn && message.request_id;
+
+  const handleCopy = useCallback(() => {
+    navigator.clipboard.writeText(message.content).then(() => {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1500);
+    });
+  }, [message.content]);
 
   const submitEdit = () => {
     if (editText.trim() && message.request_id && onEdit) {
@@ -128,6 +139,7 @@ export function MessageBubble({
           </div>
         ) : (
           <div
+            data-message-content
             className={cn(
               "rounded-lg px-3.5 py-2.5 text-sm leading-relaxed",
               isUser
@@ -140,6 +152,8 @@ export function MessageBubble({
                 <Markdown
                   remarkPlugins={[remarkGfm]}
                   rehypePlugins={[rehypeHighlight]}
+                  components={markdownComponents}
+                  skipHtml={false}
                 >
                   {message.content}
                 </Markdown>
@@ -165,6 +179,14 @@ export function MessageBubble({
               {message.input_tokens}→{message.output_tokens} tokens
             </span>
           )}
+
+          <ActionBtn
+            icon={copied ? Check : Copy}
+            label="Copy"
+            active={copied}
+            activeClass="text-green-400"
+            onClick={handleCopy}
+          />
 
           {/* Reaction buttons for assistant messages */}
           {isAssistant && onReaction && (
