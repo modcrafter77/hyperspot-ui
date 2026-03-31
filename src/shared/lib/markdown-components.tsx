@@ -1,7 +1,12 @@
 import type { Components } from "react-markdown";
-import type { HTMLAttributes } from "react";
+
+/**
+ * Custom Markdown components for beautiful rendering
+ * Optimized for dark mode with Tailwind CSS
+ */
 
 export const markdownComponents: Partial<Components> = {
+  // Tables with beautiful styling
   table: ({ children }) => (
     <div className="my-4 overflow-x-auto rounded-lg border border-border/40">
       <table className="w-full border-collapse text-sm">{children}</table>
@@ -9,15 +14,21 @@ export const markdownComponents: Partial<Components> = {
   ),
 
   thead: ({ children }) => (
-    <thead className="border-b border-border/50 bg-primary/10">{children}</thead>
+    <thead className="bg-primary/10 border-b border-border/50">{children}</thead>
   ),
 
   tbody: ({ children }) => (
     <tbody className="divide-y divide-border/30">{children}</tbody>
   ),
 
-  tr: ({ children }) => (
-    <tr className="transition-colors duration-150 hover:bg-muted/40">
+  tr: ({ children, isHeader }) => (
+    <tr
+      className={
+        isHeader
+          ? "bg-primary/5"
+          : "hover:bg-muted/40 transition-colors duration-150"
+      }
+    >
       {children}
     </tr>
   ),
@@ -32,56 +43,87 @@ export const markdownComponents: Partial<Components> = {
     <td className="px-4 py-2.5 text-foreground/85">{children}</td>
   ),
 
-  // react-markdown v10: `inline` prop removed; detect by absence of className
-  code: ({ children, className, ...rest }) => {
-    const isBlock = Boolean(className);
-    if (!isBlock) {
+  // Code with proper inline/block handling
+  code: ({ children, className, inline }) => {
+    if (inline) {
       return (
-        <code className="inline rounded border border-border/30 bg-muted/70 px-2 py-0.5 font-mono text-xs font-medium text-primary/90">
+        <code className="inline rounded bg-muted/70 px-2 py-0.5 font-mono text-xs font-medium text-primary/90 border border-border/30">
           {children}
         </code>
       );
     }
-    return <code className={className} {...(rest as HTMLAttributes<HTMLElement>)}>{children}</code>;
+    return (
+      <code className={className}>
+        {children}
+      </code>
+    );
   },
 
   pre: ({ children }) => (
-    <pre className="my-3 overflow-x-auto rounded-lg border border-border/30 bg-muted/50 p-4 font-mono text-xs leading-relaxed">
+    <pre className="my-3 overflow-x-auto rounded-lg bg-muted/50 p-4 text-xs leading-relaxed border border-border/30 font-mono">
       {children}
     </pre>
   ),
 
+  // Better typography
   blockquote: ({ children }) => (
-    <blockquote className="my-3 rounded-r-md border-l-4 border-primary/40 bg-muted/20 py-1 pl-4 pr-3 italic text-foreground/80">
+    <blockquote className="my-3 border-l-4 border-primary/40 pl-4 py-1 italic text-foreground/80 bg-muted/20 rounded-r-md pr-3">
       {children}
     </blockquote>
   ),
 
   h1: ({ children }) => (
-    <h1 className="mb-3 mt-5 text-2xl font-bold tracking-tight text-foreground">{children}</h1>
+    <h1 className="mt-5 mb-3 text-2xl font-bold text-foreground tracking-tight">
+      {children}
+    </h1>
   ),
+
   h2: ({ children }) => (
-    <h2 className="mb-2 mt-4 text-xl font-bold tracking-tight text-foreground">{children}</h2>
+    <h2 className="mt-4 mb-2 text-xl font-bold text-foreground tracking-tight">
+      {children}
+    </h2>
   ),
+
   h3: ({ children }) => (
-    <h3 className="mb-2 mt-3 text-lg font-semibold text-foreground/95">{children}</h3>
+    <h3 className="mt-3 mb-2 text-lg font-semibold text-foreground/95">
+      {children}
+    </h3>
   ),
+
   h4: ({ children }) => (
-    <h4 className="mb-1.5 mt-2 font-semibold text-foreground/90">{children}</h4>
+    <h4 className="mt-2 mb-1.5 font-semibold text-foreground/90">{children}</h4>
   ),
 
+  h5: ({ children }) => (
+    <h5 className="mt-2 mb-1.5 font-semibold text-foreground/90">{children}</h5>
+  ),
+
+  h6: ({ children }) => (
+    <h6 className="mt-2 mb-1.5 font-semibold text-foreground/90">{children}</h6>
+  ),
+
+  // Lists with better spacing
   ul: ({ children }) => (
-    <ul className="my-2 ml-5 list-disc space-y-1.5 text-foreground/90">{children}</ul>
+    <ul className="my-2 ml-5 space-y-1.5 list-disc text-foreground/90">
+      {children}
+    </ul>
   ),
-  ol: ({ children }) => (
-    <ol className="my-2 ml-5 list-decimal space-y-1.5 text-foreground/90">{children}</ol>
-  ),
-  li: ({ children }) => <li className="leading-relaxed">{children}</li>,
 
+  ol: ({ children }) => (
+    <ol className="my-2 ml-5 space-y-1.5 list-decimal text-foreground/90">
+      {children}
+    </ol>
+  ),
+
+  li: ({ children }) => (
+    <li className="leading-relaxed">{children}</li>
+  ),
+
+  // Links
   a: ({ children, href }) => (
     <a
       href={href}
-      className="break-words text-primary underline transition-colors hover:text-primary/80 hover:underline-offset-2"
+      className="text-primary hover:text-primary/80 underline hover:underline-offset-2 transition-colors break-words"
       target="_blank"
       rel="noopener noreferrer"
     >
@@ -89,12 +131,15 @@ export const markdownComponents: Partial<Components> = {
     </a>
   ),
 
+  // Paragraphs with spacing
   p: ({ children }) => (
     <p className="my-2 leading-relaxed text-foreground/90">{children}</p>
   ),
 
+  // Horizontal rule
   hr: () => <hr className="my-4 border-border/30" />,
 
+  // Images
   img: ({ alt, src, title }) => (
     <img
       alt={alt}
@@ -104,7 +149,14 @@ export const markdownComponents: Partial<Components> = {
     />
   ),
 
-  del: ({ children }) => <del className="text-foreground/70 line-through">{children}</del>,
+  // Strikethrough
+  del: ({ children }) => (
+    <del className="line-through text-foreground/70">{children}</del>
+  ),
+
+  // Strong
   strong: ({ children }) => <strong className="font-semibold">{children}</strong>,
+
+  // Emphasis
   em: ({ children }) => <em className="italic">{children}</em>,
 };

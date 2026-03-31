@@ -1,7 +1,8 @@
 import type { components } from "@/shared/api";
 
 export type SseStreamStarted = components["schemas"]["SseStreamStartedEvent"];
-export type SseDelta = components["schemas"]["SseDeltaEvent"];
+// Override: backend now sends type "text" | "reasoning"; schema only defines "text"
+export type SseDelta = { type: "text" | "reasoning"; content: string };
 export type SseCitations = components["schemas"]["SseCitationsEvent"];
 export type CitationItem = components["schemas"]["CitationItem"];
 export type QuotaWarning = components["schemas"]["QuotaWarning"];

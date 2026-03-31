@@ -1,4 +1,6 @@
 import { useState, useCallback } from "react";
+import { useReasoningStore } from "@/features/stream-response/reasoning-store";
+import { ThoughtToggle } from "./ThoughtToggle";
 import type { Message } from "@/entities/message";
 import type { components } from "@/shared/api";
 import { cn } from "@/shared/lib/cn";
@@ -46,6 +48,7 @@ export function MessageBubble({
 }: Props) {
   const isUser = message.role === "user";
   const isAssistant = message.role === "assistant";
+  const reasoning = useReasoningStore((s) => s.entries[message.id]);
   const [editing, setEditing] = useState(false);
   const [editText, setEditText] = useState(message.content);
   const [copied, setCopied] = useState(false);
@@ -99,6 +102,10 @@ export function MessageBubble({
             attachments={message.attachments}
             alignRight={isUser}
           />
+        )}
+
+        {isAssistant && reasoning && (
+          <ThoughtToggle reasoning={reasoning.text} durationMs={reasoning.durationMs} />
         )}
 
         {/* Message text or edit mode */}
