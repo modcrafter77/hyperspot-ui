@@ -1,5 +1,6 @@
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect } from "react";
 import { useStreamStore, type ActiveTurn } from "@/features/stream-response/stream-store";
+import { ThoughtToggle } from "./ThoughtToggle";
 import { mapSseError, type ErrorUiInfo } from "@/shared/lib/error-messages";
 import { cn } from "@/shared/lib/cn";
 import {
@@ -36,6 +37,7 @@ export function StreamingBubble({ chatId, onRetry }: Props) {
       </div>
       <div className="group min-w-0 max-w-[85%] space-y-2">
         <ToolIndicators turn={turn} />
+        <ThinkingBadge turn={turn} />
         <ContentBlock turn={turn} onRetry={onRetry} />
         {turn.phase === "cancelled" && (
           <span className="text-[11px] text-muted-foreground">
@@ -89,6 +91,44 @@ function ToolIndicators({ turn }: { turn: ActiveTurn }) {
       })}
     </div>
   );
+}
+
+function ThinkingBadge({ turn }: { turn: ActiveTurn }) {
+  const [elapsed, setElapsed] = useState(0);
+
+  const isThinking =
+    turn.reasoning !== "" &&
+    turn.reasoningDurationMs === null &&
+    turn.reasoningStartedAt !== null;
+
+  useEffect(() => {
+    if (!isThinking || turn.reasoningStartedAt === null) return;
+    const startedAt = turn.reasoningStartedAt;
+    setElapsed(Math.floor((Date.now() - startedAt) / 1000));
+    const id = setInterval(() => {
+      setElapsed(Math.floor((Date.now() - startedAt) / 1000));
+    }, 500);
+    return () => clearInterval(id);
+  }, [isThinking, turn.reasoningStartedAt]);
+
+  if (!turn.reasoning) return null;
+
+  if (isThinking) {
+    return (
+      <div className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
+        <span className="inline-block h-1.5 w-1.5 rounded-full bg-primary animate-pulse" />
+        <span className="font-mono">
+          Thinking{elapsed > 0 ? ` ${elapsed}s` : ""}...
+        </span>
+      </div>
+    );
+  }
+
+  const durationMs =
+    turn.reasoningDurationMs ??
+    (turn.reasoningStartedAt ? Date.now() - turn.reasoningStartedAt : 0);
+
+  return <ThoughtToggle reasoning={turn.reasoning} durationMs={durationMs} />;
 }
 
 function ContentBlock({

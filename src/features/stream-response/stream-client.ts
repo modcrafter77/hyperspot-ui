@@ -2,6 +2,7 @@ import { ApiError, getBaseUrl } from "@/shared/api";
 import { appFetch } from "@/shared/lib/fetch";
 import { parseSseStream } from "./sse-parser";
 import { useStreamStore } from "./stream-store";
+import { useReasoningStore } from "./reasoning-store";
 import { mapSseError } from "@/shared/lib/error-messages";
 import { trackError } from "@/shared/lib/telemetry";
 import type { components } from "@/shared/api";
@@ -61,7 +62,11 @@ async function runSseStream(
         case "ping":
           break;
         case "delta":
-          s.onDelta(event.data.content);
+          if (event.data.type === "reasoning") {
+            s.onReasoningDelta(event.data.content);
+          } else {
+            s.onDelta(event.data.content);
+          }
           break;
         case "tool":
           s.onTool(event.data);
@@ -69,9 +74,23 @@ async function runSseStream(
         case "citations":
           s.onCitations(event.data.items);
           break;
-        case "done":
+        case "done": {
+          // Persist reasoning before clearing turn state
+          const { activeTurn } = useStreamStore.getState();
+          if (activeTurn?.assistantMessageId && activeTurn.reasoning) {
+            const durationMs =
+              activeTurn.reasoningDurationMs ??
+              (activeTurn.reasoningStartedAt
+                ? Date.now() - activeTurn.reasoningStartedAt
+                : 0);
+            useReasoningStore.getState().setEntry(activeTurn.assistantMessageId, {
+              text: activeTurn.reasoning,
+              durationMs,
+            });
+          }
           s.onDone(event.data);
           return;
+        }
         case "error": {
           const info = mapSseError(event.data);
           trackError("mid_stream", event.data.code, info);

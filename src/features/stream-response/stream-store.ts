@@ -17,6 +17,9 @@ export type ActiveTurn = {
   citations: CitationItem[];
   doneData: SseDone | null;
   errorData: SseError | null;
+  reasoning: string;
+  reasoningStartedAt: number | null; // Date.now() when first reasoning delta arrives
+  reasoningDurationMs: number | null; // Frozen when first text delta or stream ends
 };
 
 type StreamState = {
@@ -28,6 +31,7 @@ type StreamActions = {
   startTurn: (chatId: string, requestId: string) => AbortController;
   onStreamStarted: (messageId: string) => void;
   onDelta: (content: string) => void;
+  onReasoningDelta: (content: string) => void;
   onTool: (tool: SseTool) => void;
   onCitations: (items: CitationItem[]) => void;
   onDone: (data: SseDone) => void;
@@ -59,6 +63,9 @@ export const useStreamStore = create<StreamState & StreamActions>(
           citations: [],
           doneData: null,
           errorData: null,
+          reasoning: "",
+          reasoningStartedAt: null,
+          reasoningDurationMs: null,
         },
       });
       return ac;
@@ -80,10 +87,31 @@ export const useStreamStore = create<StreamState & StreamActions>(
     onDelta: (content) => {
       set((s) => {
         if (!s.activeTurn) return s;
+        // Freeze reasoning timer on first text delta
+        const reasoningDurationMs =
+          s.activeTurn.reasoningDurationMs !== null
+            ? s.activeTurn.reasoningDurationMs
+            : s.activeTurn.reasoningStartedAt !== null
+              ? Date.now() - s.activeTurn.reasoningStartedAt
+              : null;
         return {
           activeTurn: {
             ...s.activeTurn,
             partialText: s.activeTurn.partialText + content,
+            reasoningDurationMs,
+          },
+        };
+      });
+    },
+
+    onReasoningDelta: (content) => {
+      set((s) => {
+        if (!s.activeTurn) return s;
+        return {
+          activeTurn: {
+            ...s.activeTurn,
+            reasoning: s.activeTurn.reasoning + content,
+            reasoningStartedAt: s.activeTurn.reasoningStartedAt ?? Date.now(),
           },
         };
       });
@@ -117,11 +145,19 @@ export const useStreamStore = create<StreamState & StreamActions>(
     onDone: (data) => {
       set((s) => {
         if (!s.activeTurn) return s;
+        // Freeze reasoning timer if it wasn't already frozen by a text delta
+        const reasoningDurationMs =
+          s.activeTurn.reasoningDurationMs !== null
+            ? s.activeTurn.reasoningDurationMs
+            : s.activeTurn.reasoningStartedAt !== null
+              ? Date.now() - s.activeTurn.reasoningStartedAt
+              : null;
         return {
           activeTurn: {
             ...s.activeTurn,
             phase: "done",
             doneData: data,
+            reasoningDurationMs,
           },
           abortController: null,
         };
