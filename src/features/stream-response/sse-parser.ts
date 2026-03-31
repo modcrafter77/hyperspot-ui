@@ -8,9 +8,8 @@ export async function* parseSseStream(
   body: ReadableStream<Uint8Array>,
   signal?: AbortSignal,
 ): AsyncGenerator<SseEvent> {
-  const decoder = new TextDecoderStream();
-  const readable = body.pipeThrough(decoder as unknown as TransformStream<Uint8Array, string>);
-  const reader = readable.getReader();
+  const reader = body.getReader();
+  const decoder = new TextDecoder("utf-8");
   let buffer = "";
 
   try {
@@ -20,7 +19,15 @@ export async function* parseSseStream(
       const { done, value } = await reader.read();
       if (done) break;
 
-      buffer += value;
+      // Tauri's HTTP plugin may yield pre-decoded strings instead of Uint8Array.
+      // Passing a string to TextDecoder.decode() truncates code points > 0xFF, breaking
+      // non-ASCII (Cyrillic, CJK, etc.). Use the string directly when possible.
+      if (typeof value === "string") {
+        buffer += value;
+      } else {
+        // { stream: true } keeps decoder state for multi-byte sequences split across chunks
+        buffer += decoder.decode(value, { stream: true });
+      }
       const lines = buffer.split("\n");
       buffer = lines.pop() ?? "";
 
