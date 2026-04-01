@@ -1,4 +1,4 @@
-import { useCallback, useRef, useEffect, Fragment, useMemo } from "react";
+import { useCallback, useRef, useEffect, useMemo } from "react";
 import { useMessagesInfinite } from "@/entities/message";
 import { MessageBubble } from "./MessageBubble";
 import { StreamingBubble } from "./StreamingBubble";
@@ -15,8 +15,18 @@ export function ChatView({ chatId }: Props) {
   const { data, fetchNextPage, hasNextPage, isFetchingNextPage, isError, error } =
     useMessagesInfinite(chatId);
 
-  const turn = useStreamStore((s) => s.activeTurn);
-  const isActive = turn?.chatId === chatId && turn.phase !== "idle";
+  // Derive primitives from the store so ChatView (and its entire message list)
+  // does NOT re-render on every SSE delta.  Only StreamingBubble subscribes
+  // to the full activeTurn object.
+  const isActive = useStreamStore(
+    (s) => s.activeTurn !== null && s.activeTurn.chatId === chatId && s.activeTurn.phase !== "idle",
+  );
+  const streamingMsgId = useStreamStore(
+    (s) => {
+      const t = s.activeTurn;
+      return t && t.chatId === chatId && t.phase !== "idle" ? t.assistantMessageId : null;
+    },
+  );
 
   const { handleRetry, handleEdit, handleDelete } = useTurnActions(chatId);
   const { toggleReaction } = useReaction(chatId);
@@ -24,7 +34,13 @@ export function ChatView({ chatId }: Props) {
   const scrollRef = useRef<HTMLDivElement>(null);
   const stickRef = useRef(true);
 
-  const allMessages = data?.pages.flatMap((p) => p.items) ?? [];
+  // Memoize based on `data` (the stable reference from TanStack Query).
+  // Previously a bare flatMap created a new array every render, which also
+  // broke the downstream useMemo that depended on it.
+  const allMessages = useMemo(
+    () => data?.pages.flatMap((p) => p.items) ?? [],
+    [data],
+  );
   const messageCount = allMessages.length;
 
   const isNearBottom = useCallback(() => {
@@ -78,16 +94,15 @@ export function ChatView({ chatId }: Props) {
     [isFetchingNextPage, hasNextPage, fetchNextPage],
   );
 
-  const streamingMsgId = isActive ? turn?.assistantMessageId : null;
-  const messages = allMessages
-    .filter((m) => m.id !== streamingMsgId)
-    .reverse();
+  const messages = useMemo(
+    () => allMessages.filter((m) => m.id !== streamingMsgId).reverse(),
+    [allMessages, streamingMsgId],
+  );
 
   // Find the request_id of the last turn (latest user+assistant pair)
   const lastTurnRequestId = useMemo(() => {
     if (allMessages.length === 0) return null;
-    const newest = allMessages[0];
-    return newest?.request_id ?? null;
+    return allMessages[0]?.request_id ?? null;
   }, [allMessages]);
 
   if (isError) {
@@ -124,22 +139,21 @@ export function ChatView({ chatId }: Props) {
         </div>
       )}
 
-      <div className="mx-auto w-full max-w-3xl space-y-1 px-4 py-4">
+      <div role="log" aria-live="polite" className="mx-auto w-full max-w-3xl space-y-1 px-4 py-4">
         {messages.map((msg) => (
-          <Fragment key={msg.id}>
-            <MessageBubble
-              message={msg}
-              isLastTurn={
-                !isActive &&
-                !!msg.request_id &&
-                msg.request_id === lastTurnRequestId
-              }
-              onRetry={handleRetry}
-              onEdit={handleEdit}
-              onDelete={handleDelete}
-              onReaction={toggleReaction}
-            />
-          </Fragment>
+          <MessageBubble
+            key={msg.id}
+            message={msg}
+            isLastTurn={
+              !isActive &&
+              !!msg.request_id &&
+              msg.request_id === lastTurnRequestId
+            }
+            onRetry={handleRetry}
+            onEdit={handleEdit}
+            onDelete={handleDelete}
+            onReaction={toggleReaction}
+          />
         ))}
 
         <StreamingBubble chatId={chatId} onRetry={handleRetry} />

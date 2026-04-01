@@ -17,6 +17,26 @@ export class ApiError extends Error {
   }
 }
 
+/** Parse an error response body and throw an ApiError. Extracted to avoid
+ *  the identical try/catch block being repeated across fetchJson, fetchDelete,
+ *  and uploadFile. */
+async function throwApiError(res: Response, path: string): Promise<never> {
+  let problem: ErrorResponse;
+  try {
+    problem = await res.json();
+  } catch {
+    problem = {
+      type: "about:blank",
+      title: res.statusText,
+      status: res.status,
+      detail: `HTTP ${res.status}`,
+      instance: path,
+      code: "",
+    };
+  }
+  throw new ApiError(res.status, problem);
+}
+
 let baseUrl = "";
 let getAccessToken: (() => string | null) | null = null;
 
@@ -30,6 +50,23 @@ export function configureApi(opts: {
 
 export function getBaseUrl(): string {
   return baseUrl;
+}
+
+/** Resolve the effective base URL and apply it via configureApi.
+ *  In dev mode with no URL configured, uses the Vite proxy (empty base).
+ *  Extracted here (next to configureApi) to avoid a circular dependency
+ *  when feature modules need to reconfigure the API at runtime. */
+export function applyServerUrl(serverUrl: string) {
+  if (import.meta.env.DEV && !serverUrl) {
+    configureApi({ baseUrl: "" });
+  } else {
+    configureApi({
+      baseUrl:
+        serverUrl ||
+        import.meta.env.VITE_API_BASE_URL ||
+        "http://127.0.0.1:8087/cf/mini-chat",
+    });
+  }
 }
 
 function authHeaders(): Record<string, string> {
@@ -52,22 +89,7 @@ export async function fetchJson<T>(
     },
   });
 
-  if (!res.ok) {
-    let problem: ErrorResponse;
-    try {
-      problem = await res.json();
-    } catch {
-      problem = {
-        type: "about:blank",
-        title: res.statusText,
-        status: res.status,
-        detail: `HTTP ${res.status}`,
-        instance: path,
-        code: "",
-      };
-    }
-    throw new ApiError(res.status, problem);
-  }
+  if (!res.ok) await throwApiError(res, path);
 
   if (res.status === 204) return undefined as T;
   return res.json();
@@ -80,22 +102,7 @@ export async function fetchDelete(path: string): Promise<void> {
     headers: { ...authHeaders() },
   });
 
-  if (!res.ok) {
-    let problem: ErrorResponse;
-    try {
-      problem = await res.json();
-    } catch {
-      problem = {
-        type: "about:blank",
-        title: res.statusText,
-        status: res.status,
-        detail: `HTTP ${res.status}`,
-        instance: path,
-        code: "",
-      };
-    }
-    throw new ApiError(res.status, problem);
-  }
+  if (!res.ok) await throwApiError(res, path);
 }
 
 export async function uploadFile<T>(
@@ -112,22 +119,7 @@ export async function uploadFile<T>(
     body: form,
   });
 
-  if (!res.ok) {
-    let problem: ErrorResponse;
-    try {
-      problem = await res.json();
-    } catch {
-      problem = {
-        type: "about:blank",
-        title: res.statusText,
-        status: res.status,
-        detail: `HTTP ${res.status}`,
-        instance: path,
-        code: "",
-      };
-    }
-    throw new ApiError(res.status, problem);
-  }
+  if (!res.ok) await throwApiError(res, path);
 
   return res.json();
 }

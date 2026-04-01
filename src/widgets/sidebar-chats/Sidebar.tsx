@@ -100,7 +100,7 @@ function ChatList() {
     ? `contains(title, '${filter.replace(/'/g, "''")}')`
     : undefined;
 
-  const { data, fetchNextPage, hasNextPage, isFetchingNextPage } =
+  const { data, fetchNextPage, hasNextPage, isFetchingNextPage, isLoading } =
     useChatsInfinite(odataFilter);
 
   const observer = useRef<IntersectionObserver | null>(null);
@@ -119,6 +119,10 @@ function ChatList() {
   );
 
   const chats = data?.pages.flatMap((p) => p.items) ?? [];
+
+  // useInfiniteQuery doesn't throw a Promise, so the <Suspense> boundary above
+  // never fires for this query. Render the skeleton inline on first load.
+  if (isLoading) return <SidebarSkeleton />;
 
   if (chats.length === 0) {
     return (

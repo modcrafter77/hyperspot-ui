@@ -5,6 +5,7 @@ import {
   deleteAttachment,
   type Attachment,
 } from "@/entities/attachment";
+import { ApiError } from "@/shared/api";
 
 export type LocalAttachment = {
   id: string;
@@ -34,6 +35,7 @@ type AttachmentActions = {
 
 const IMAGE_MIMES = new Set(["image/png", "image/jpeg", "image/webp"]);
 const POLL_INTERVAL_MS = 2000;
+const POLL_BACKOFF_MAX_MS = 15000;
 const MAX_POLLS = 60;
 
 export const useAttachmentStore = create<AttachmentState & AttachmentActions>(
@@ -85,10 +87,7 @@ export const useAttachmentStore = create<AttachmentState & AttachmentActions>(
           }
         })
         .catch((err) => {
-          const code =
-            err && typeof err === "object" && "code" in err
-              ? (err as { code: string }).code
-              : "";
+          const code = err instanceof ApiError ? err.code : "";
           const UPLOAD_ERRORS: Record<string, string> = {
             quota_exceeded: "Quota exhausted — cannot upload",
             file_too_large: "File exceeds the size limit",
@@ -140,10 +139,7 @@ export const useAttachmentStore = create<AttachmentState & AttachmentActions>(
           });
         })
         .catch((err) => {
-          const code =
-            err && typeof err === "object" && "code" in err
-              ? (err as { code: string }).code
-              : "";
+          const code = err instanceof ApiError ? err.code : "";
           if (code === "attachment_locked") {
             set((s) => {
               const cur = s.items[id];
@@ -198,11 +194,19 @@ export const useAttachmentStore = create<AttachmentState & AttachmentActions>(
   }),
 );
 
+/** Compute poll delay with exponential backoff on consecutive errors.
+ *  Normal polls use the base interval; error retries grow exponentially. */
+function pollDelay(errorStreak: number): number {
+  if (errorStreak === 0) return POLL_INTERVAL_MS;
+  return Math.min(POLL_INTERVAL_MS * 2 ** errorStreak, POLL_BACKOFF_MAX_MS);
+}
+
 function startPolling(
   storeId: string,
   chatId: string,
   attachmentId: string,
   attempt = 0,
+  errorStreak = 0,
 ) {
   if (attempt >= MAX_POLLS) {
     useAttachmentStore.setState((s) => {
@@ -238,12 +242,14 @@ function startPolling(
       });
 
       if (attachment.status === "pending") {
-        startPolling(storeId, chatId, attachmentId, attempt + 1);
+        // Success resets the error streak
+        startPolling(storeId, chatId, attachmentId, attempt + 1, 0);
       }
     } catch {
-      startPolling(storeId, chatId, attachmentId, attempt + 1);
+      // Exponential backoff: each consecutive error doubles the delay
+      startPolling(storeId, chatId, attachmentId, attempt + 1, errorStreak + 1);
     }
-  }, POLL_INTERVAL_MS);
+  }, pollDelay(errorStreak));
 
   useAttachmentStore.setState((s) => {
     const item = s.items[storeId];

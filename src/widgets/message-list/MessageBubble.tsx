@@ -1,4 +1,4 @@
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect, memo } from "react";
 import { useReasoningStore } from "@/features/stream-response/reasoning-store";
 import { ThoughtToggle } from "./ThoughtToggle";
 import type { Message } from "@/entities/message";
@@ -25,6 +25,9 @@ import rehypeHighlight from "rehype-highlight";
 import rehypeKatex from "rehype-katex";
 import { markdownComponents } from "@/shared/lib/markdown-components";
 
+const REMARK_PLUGINS = [remarkGfm, remarkMath];
+const REHYPE_PLUGINS = [rehypeHighlight, rehypeKatex];
+
 type AttachmentSummary = components["schemas"]["AttachmentSummary"];
 
 type Props = {
@@ -40,7 +43,11 @@ type Props = {
   ) => void;
 };
 
-export function MessageBubble({
+// memo: ChatView renders every MessageBubble on any query refetch.
+// TanStack Query's structuralSharing preserves object references for
+// unchanged messages, so shallow comparison skips re-rendering most
+// bubbles — each of which runs a full <Markdown> pipeline.
+export const MessageBubble = memo(function MessageBubble({
   message,
   isLastTurn,
   onRetry,
@@ -57,11 +64,17 @@ export function MessageBubble({
 
   const canAct = isLastTurn && message.request_id;
 
+  // Keep edit textarea in sync if the message is updated (e.g. after a successful edit)
+  // while not currently editing (don't clobber in-progress edits).
+  useEffect(() => {
+    if (!editing) setEditText(message.content);
+  }, [message.content, editing]);
+
   const handleCopy = useCallback(() => {
     navigator.clipboard.writeText(message.content).then(() => {
       setCopied(true);
       setTimeout(() => setCopied(false), 1500);
-    });
+    }).catch(() => {/* clipboard access denied */});
   }, [message.content]);
 
   const submitEdit = () => {
@@ -159,10 +172,9 @@ export function MessageBubble({
             {isAssistant ? (
               <div className="prose prose-invert prose-sm max-w-none">
                 <Markdown
-                  remarkPlugins={[remarkGfm, remarkMath]}
-                  rehypePlugins={[rehypeHighlight, rehypeKatex]}
+                  remarkPlugins={REMARK_PLUGINS}
+                  rehypePlugins={REHYPE_PLUGINS}
                   components={markdownComponents}
-                  skipHtml={false}
                 >
                   {message.content}
                 </Markdown>
@@ -247,7 +259,7 @@ export function MessageBubble({
       </div>
     </div>
   );
-}
+});
 
 function ActionBtn({
   icon: Icon,
