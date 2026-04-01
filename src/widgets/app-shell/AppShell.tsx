@@ -18,6 +18,20 @@ import { PanelLeftClose, PanelLeft, Search as SearchIcon } from "lucide-react";
 const SIDEBAR_MIN = 200;
 const SIDEBAR_MAX = 480;
 
+// Stable skeleton widths — Math.random() in render causes layout shift.
+const SKELETON_WIDTHS: [string, string][] = [
+  ["75%", "50%"],
+  ["55%", "40%"],
+  ["65%", "55%"],
+  ["45%", "35%"],
+];
+
+// Platform-aware keyboard shortcut label for the search button.
+const SEARCH_KBD =
+  typeof navigator !== "undefined" && /Mac|iPhone|iPad|iPod/i.test(navigator.userAgent)
+    ? "\u2318K"
+    : "Ctrl+K";
+
 export function AppShell() {
   const sidebarOpen = useAppStore((s) => s.sidebarOpen);
   const sidebarWidth = useAppStore((s) => s.sidebarWidth);
@@ -109,7 +123,7 @@ export function AppShell() {
             <SearchIcon className="h-3.5 w-3.5" />
             <span className="hidden sm:inline">Search</span>
             <kbd className="hidden rounded bg-muted px-1 py-0.5 text-[10px] font-medium sm:inline-block">
-              {"\u2318"}K
+              {SEARCH_KBD}
             </kbd>
           </button>
         </header>
@@ -171,16 +185,10 @@ function ChatHeaderSkeleton() {
 function MessagesSkeleton() {
   return (
     <div className="flex flex-col gap-4 p-6">
-      {Array.from({ length: 4 }).map((_, i) => (
+      {SKELETON_WIDTHS.map(([w1, w2], i) => (
         <div key={i} className="flex flex-col gap-2">
-          <div
-            className="h-4 animate-pulse rounded bg-muted"
-            style={{ width: `${40 + Math.random() * 40}%` }}
-          />
-          <div
-            className="h-4 animate-pulse rounded bg-muted"
-            style={{ width: `${30 + Math.random() * 30}%` }}
-          />
+          <div className="h-4 animate-pulse rounded bg-muted" style={{ width: w1 }} />
+          <div className="h-4 animate-pulse rounded bg-muted" style={{ width: w2 }} />
         </div>
       ))}
     </div>

@@ -2,6 +2,7 @@ import {
   useState,
   useRef,
   useCallback,
+  useEffect,
   type KeyboardEvent,
 } from "react";
 import { useQueryClient } from "@tanstack/react-query";
@@ -219,6 +220,17 @@ function ModelDropdown({
   onSelect: (id: string) => void;
   onClose: () => void;
 }) {
+  useEffect(() => {
+    const handler = (e: globalThis.KeyboardEvent) => {
+      if (e.key === "Escape") {
+        e.preventDefault();
+        onClose();
+      }
+    };
+    document.addEventListener("keydown", handler);
+    return () => document.removeEventListener("keydown", handler);
+  }, [onClose]);
+
   return (
     <>
       <div className="fixed inset-0 z-40" onClick={onClose} />

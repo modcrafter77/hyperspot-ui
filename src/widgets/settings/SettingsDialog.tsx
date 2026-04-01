@@ -1,7 +1,7 @@
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useAppStore } from "@/app/store";
-import { applyServerUrl } from "@/main";
+import { applyServerUrl } from "@/shared/api";
 import { Dialog } from "@/shared/ui/Dialog";
 import { retryAfterSettings } from "@/shared/ui/ErrorBoundary";
 import { toast } from "sonner";
@@ -67,7 +67,10 @@ function SettingsDialogInner({
   onSave: () => void;
   onOpen: () => void;
 }) {
-  useState(() => onOpen());
+  // Sync draft with the current store value when the dialog mounts.
+  // Previously used useState(() => onOpen()) which abuses the initializer
+  // for side effects and fires twice in React 18 Strict Mode.
+  useEffect(onOpen, [onOpen]);
 
   return (
     <Dialog open onClose={onClose} title="Settings">

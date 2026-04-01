@@ -1,5 +1,7 @@
 import { useState, useCallback, useEffect } from "react";
+import remarkGfm from "remark-gfm";
 import remarkMath from "remark-math";
+import rehypeHighlight from "rehype-highlight";
 import rehypeKatex from "rehype-katex";
 import { useStreamStore, type ActiveTurn } from "@/features/stream-response/stream-store";
 import { ThoughtToggle } from "./ThoughtToggle";
@@ -20,9 +22,12 @@ import {
   Check,
 } from "lucide-react";
 import Markdown from "react-markdown";
-import remarkGfm from "remark-gfm";
-import rehypeHighlight from "rehype-highlight";
 import { markdownComponents } from "@/shared/lib/markdown-components";
+
+// Module-level constants — stable references prevent unnecessary reconciliation
+// on every SSE delta re-render (~60 updates/s during streaming).
+const REMARK_PLUGINS = [remarkGfm, remarkMath];
+const REHYPE_PLUGINS = [rehypeHighlight, rehypeKatex];
 
 type Props = { chatId: string; onRetry?: (requestId: string) => void };
 
@@ -158,7 +163,7 @@ function ContentBlock({
       <div className="rounded-lg bg-card px-3.5 py-2.5">
         {turn.partialText && (
           <div className="prose prose-invert prose-sm max-w-none">
-            <Markdown remarkPlugins={[remarkGfm, remarkMath]} rehypePlugins={[rehypeHighlight, rehypeKatex]} components={markdownComponents} skipHtml={false}>
+            <Markdown remarkPlugins={REMARK_PLUGINS} rehypePlugins={REHYPE_PLUGINS} components={markdownComponents}>
               {turn.partialText}
             </Markdown>
           </div>
@@ -182,7 +187,7 @@ function ContentBlock({
   return (
     <div className="rounded-lg bg-card px-3.5 py-2.5 text-sm leading-relaxed text-card-foreground">
       <div className="prose prose-invert prose-sm max-w-none">
-        <Markdown remarkPlugins={[remarkGfm, remarkMath]} rehypePlugins={[rehypeHighlight, rehypeKatex]} components={markdownComponents} skipHtml={false}>
+        <Markdown remarkPlugins={REMARK_PLUGINS} rehypePlugins={REHYPE_PLUGINS} components={markdownComponents}>
           {turn.partialText}
         </Markdown>
       </div>
@@ -199,7 +204,7 @@ function CopyBtn({ text }: { text: string }) {
     navigator.clipboard.writeText(text).then(() => {
       setCopied(true);
       setTimeout(() => setCopied(false), 1500);
-    });
+    }).catch(() => {/* clipboard access denied */});
   }, [text]);
 
   return (

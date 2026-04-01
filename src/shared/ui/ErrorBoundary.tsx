@@ -11,21 +11,23 @@ type Props = {
 };
 type State = { error: Error | null };
 
-let resetBoundary: (() => void) | null = null;
+// Multiple ErrorBoundary instances can coexist (root + per-section).
+// A Set ensures retryAfterSettings resets all of them, not just the last-mounted.
+const resetBoundaries = new Set<() => void>();
 
 export function retryAfterSettings() {
-  resetBoundary?.();
+  resetBoundaries.forEach((fn) => fn());
 }
 
 export class ErrorBoundary extends Component<Props, State> {
   state: State = { error: null };
 
   componentDidMount() {
-    resetBoundary = this.handleRetry;
+    resetBoundaries.add(this.handleRetry);
   }
 
   componentWillUnmount() {
-    if (resetBoundary === this.handleRetry) resetBoundary = null;
+    resetBoundaries.delete(this.handleRetry);
   }
 
   static getDerivedStateFromError(error: Error) {

@@ -33,7 +33,7 @@ export function ThoughtToggle({ reasoning, durationMs }: Props) {
 
       <div
         className={cn(
-          "overflow-hidden transition-all duration-250",
+          "overflow-hidden transition-all duration-200",
           open ? "max-h-64 opacity-100 mt-2" : "max-h-0 opacity-0 pointer-events-none",
         )}
       >

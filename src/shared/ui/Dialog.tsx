@@ -17,6 +17,7 @@ type Props = {
 
 export function Dialog({ open, onClose, title, children, className }: Props) {
   const overlayRef = useRef<HTMLDivElement>(null);
+  const titleId = `dialog-title-${title.replace(/\s+/g, "-").toLowerCase()}`;
 
   useEffect(() => {
     if (!open) return;
@@ -40,16 +41,20 @@ export function Dialog({ open, onClose, title, children, className }: Props) {
       className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 transition-opacity"
     >
       <div
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby={titleId}
         className={cn(
           "w-full max-w-md rounded-lg border border-border bg-card p-5 shadow-2xl",
           className,
         )}
       >
         <div className="mb-4 flex items-center justify-between">
-          <h2 className="text-base font-semibold text-foreground">{title}</h2>
+          <h2 id={titleId} className="text-base font-semibold text-foreground">{title}</h2>
           <button
             onClick={onClose}
             className="rounded-md p-1 text-muted-foreground hover:bg-secondary hover:text-foreground"
+            aria-label="Close"
           >
             <X className="h-4 w-4" />
           </button>

@@ -10,6 +10,11 @@ import {
 } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
 
+const NEW_CHAT_KBD =
+  typeof navigator !== "undefined" && /Mac|iPhone|iPad|iPod/i.test(navigator.userAgent)
+    ? "\u2318N"
+    : "Ctrl+N";
+
 export function CommandPalette() {
   const open = useAppStore((s) => s.commandPaletteOpen);
   const setOpen = useAppStore((s) => s.setCommandPaletteOpen);
@@ -21,7 +26,7 @@ export function CommandPalette() {
   const odataFilter = search
     ? `contains(title, '${search.replace(/'/g, "''")}')`
     : undefined;
-  const { data } = useChatsInfinite(odataFilter);
+  const { data, isError } = useChatsInfinite(odataFilter);
   const chats = data?.pages.flatMap((p) => p.items) ?? [];
 
   const close = useCallback(() => {
@@ -77,7 +82,7 @@ export function CommandPalette() {
         </div>
         <Command.List className="max-h-[300px] overflow-y-auto p-1.5">
           <Command.Empty className="px-3 py-6 text-center text-sm text-muted-foreground">
-            No chats found.
+            {isError ? "Failed to load chats" : "No chats found."}
           </Command.Empty>
 
           <Command.Group heading="Actions" className="px-1 py-1.5 text-[11px] font-medium text-muted-foreground">
@@ -89,7 +94,7 @@ export function CommandPalette() {
               <Plus className="h-4 w-4 text-muted-foreground" />
               New chat
               <kbd className="ml-auto rounded bg-muted px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground">
-                {"\u2318"}N
+                {NEW_CHAT_KBD}
               </kbd>
             </Command.Item>
           </Command.Group>

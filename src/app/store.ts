@@ -66,31 +66,41 @@ export const useAppStore = create<AppState & AppActions>()(
   })),
 );
 
-useAppStore.subscribe(
-  (s) => s.sidebarOpen,
-  (open) => savePreference("sidebarOpen", open),
-);
+// Persist preferences and apply theme via store subscriptions.
+// Wrapped in a setup function so HMR can tear down stale listeners.
+function setupSubscriptions() {
+  const unsubs = [
+    useAppStore.subscribe(
+      (s) => s.sidebarOpen,
+      (open) => savePreference("sidebarOpen", open),
+    ),
+    useAppStore.subscribe(
+      (s) => s.sidebarWidth,
+      (w) => savePreference("sidebarWidth", w),
+    ),
+    useAppStore.subscribe(
+      (s) => s.selectedChatId,
+      (id) => savePreference("lastChatId", id),
+    ),
+    useAppStore.subscribe(
+      (s) => s.serverUrl,
+      (url) => savePreference("serverUrl", url),
+    ),
+    useAppStore.subscribe(
+      (s) => s.theme,
+      (theme) => {
+        document.documentElement.classList.toggle("light", theme === "light");
+        localStorage.setItem("theme", theme);
+      },
+      { fireImmediately: true },
+    ),
+  ];
+  return () => unsubs.forEach((fn) => fn());
+}
 
-useAppStore.subscribe(
-  (s) => s.sidebarWidth,
-  (w) => savePreference("sidebarWidth", w),
-);
+const teardown = setupSubscriptions();
 
-useAppStore.subscribe(
-  (s) => s.selectedChatId,
-  (id) => savePreference("lastChatId", id),
-);
-
-useAppStore.subscribe(
-  (s) => s.serverUrl,
-  (url) => savePreference("serverUrl", url),
-);
-
-useAppStore.subscribe(
-  (s) => s.theme,
-  (theme) => {
-    document.documentElement.classList.toggle("light", theme === "light");
-    localStorage.setItem("theme", theme);
-  },
-  { fireImmediately: true },
-);
+// Prevent duplicate subscriptions when Vite hot-reloads this module.
+if (import.meta.hot) {
+  import.meta.hot.dispose(() => teardown());
+}
