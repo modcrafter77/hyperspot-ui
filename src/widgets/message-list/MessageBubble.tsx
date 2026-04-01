@@ -20,7 +20,9 @@ import {
 } from "lucide-react";
 import Markdown from "react-markdown";
 import remarkGfm from "remark-gfm";
+import remarkMath from "remark-math";
 import rehypeHighlight from "rehype-highlight";
+import rehypeKatex from "rehype-katex";
 import { markdownComponents } from "@/shared/lib/markdown-components";
 
 type AttachmentSummary = components["schemas"]["AttachmentSummary"];
@@ -157,8 +159,8 @@ export function MessageBubble({
             {isAssistant ? (
               <div className="prose prose-invert prose-sm max-w-none">
                 <Markdown
-                  remarkPlugins={[remarkGfm]}
-                  rehypePlugins={[rehypeHighlight]}
+                  remarkPlugins={[remarkGfm, remarkMath]}
+                  rehypePlugins={[rehypeHighlight, rehypeKatex]}
                   components={markdownComponents}
                   skipHtml={false}
                 >

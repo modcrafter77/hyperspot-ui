@@ -3,6 +3,7 @@ import { Toaster } from "sonner";
 import { AppShell } from "@/widgets/app-shell/AppShell";
 import { SettingsDialog } from "@/widgets/settings/SettingsDialog";
 import { ErrorBoundary } from "@/shared/ui/ErrorBoundary";
+import { useAppStore } from "./store";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -14,19 +15,28 @@ const queryClient = new QueryClient({
   },
 });
 
-export function App() {
+function AppWithTheme() {
+  const theme = useAppStore((s) => s.theme);
   return (
-    <QueryClientProvider client={queryClient}>
+    <>
       <ErrorBoundary queryClient={queryClient}>
         <AppShell />
       </ErrorBoundary>
       <SettingsDialog />
       <Toaster
         position="bottom-right"
-        theme="dark"
+        theme={theme}
         richColors
         closeButton
       />
+    </>
+  );
+}
+
+export function App() {
+  return (
+    <QueryClientProvider client={queryClient}>
+      <AppWithTheme />
     </QueryClientProvider>
   );
 }
