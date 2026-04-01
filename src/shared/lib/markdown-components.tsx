@@ -21,14 +21,8 @@ export const markdownComponents: Partial<Components> = {
     <tbody className="divide-y divide-border/30">{children}</tbody>
   ),
 
-  tr: ({ children, isHeader }) => (
-    <tr
-      className={
-        isHeader
-          ? "bg-primary/5"
-          : "hover:bg-muted/40 transition-colors duration-150"
-      }
-    >
+  tr: ({ children }) => (
+    <tr className="hover:bg-muted/40 transition-colors duration-150">
       {children}
     </tr>
   ),
@@ -43,24 +37,23 @@ export const markdownComponents: Partial<Components> = {
     <td className="px-4 py-2.5 text-foreground/85">{children}</td>
   ),
 
-  // Code with proper inline/block handling
-  code: ({ children, className, inline }) => {
-    if (inline) {
+  // Code: react-markdown v10 removed the `inline` prop.
+  // Both inline code and fenced code blocks without a language have className=undefined.
+  // We distinguish them by checking for newlines in the content.
+  code: ({ children, className }) => {
+    const isBlock = Boolean(className) || String(children).includes("\n");
+    if (!isBlock) {
       return (
-        <code className="inline rounded bg-muted/70 px-2 py-0.5 font-mono text-xs font-medium text-primary/90 border border-border/30">
+        <code className="rounded bg-secondary px-1.5 py-0.5 font-mono text-[0.85em] font-medium text-foreground border border-border/50">
           {children}
         </code>
       );
     }
-    return (
-      <code className={className}>
-        {children}
-      </code>
-    );
+    return <code className={className}>{children}</code>;
   },
 
   pre: ({ children }) => (
-    <pre className="my-3 overflow-x-auto rounded-lg bg-muted/50 p-4 text-xs leading-relaxed border border-border/30 font-mono">
+    <pre className="my-3 overflow-x-auto rounded-lg border border-border/30 text-xs leading-relaxed [&>code.hljs]:rounded-lg [&>code.hljs]:p-4">
       {children}
     </pre>
   ),
@@ -155,7 +148,7 @@ export const markdownComponents: Partial<Components> = {
   ),
 
   // Strong
-  strong: ({ children }) => <strong className="font-semibold">{children}</strong>,
+  strong: ({ children }) => <strong className="font-bold text-foreground">{children}</strong>,
 
   // Emphasis
   em: ({ children }) => <em className="italic">{children}</em>,
