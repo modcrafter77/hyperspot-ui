@@ -1,7 +1,7 @@
 import { Suspense, useCallback, useEffect, useRef, useState } from "react";
 import { useAppStore } from "@/app/store";
 import { useChatsInfinite, type ChatDetail } from "@/entities/chat";
-import { Search, Plus, Loader2, Pencil, Trash2, MoreHorizontal, Settings } from "lucide-react";
+import { Search, Plus, Loader2, Pencil, Trash2, MoreHorizontal, Settings, Sun, Moon } from "lucide-react";
 import { cn } from "@/shared/lib/cn";
 import { QuotaSummary } from "@/widgets/quota-panel/QuotaSummary";
 import { ErrorBoundary } from "@/shared/ui/ErrorBoundary";
@@ -12,6 +12,8 @@ import { formatDistanceToNow } from "date-fns";
 export function Sidebar() {
   const selectChat = useAppStore((s) => s.selectChat);
   const setSettingsOpen = useAppStore((s) => s.setSettingsOpen);
+  const theme = useAppStore((s) => s.theme);
+  const toggleTheme = useAppStore((s) => s.toggleTheme);
 
   const handleNewChat = useCallback(() => {
     selectChat(null);
@@ -30,14 +32,22 @@ export function Sidebar() {
           </Suspense>
         </ErrorBoundary>
       </div>
-      <div className="border-t border-sidebar-border px-3 py-2">
+      <div className="border-t border-sidebar-border px-3 py-2 flex items-center gap-1">
         <button
           onClick={() => setSettingsOpen(true)}
-          className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-xs text-sidebar-foreground hover:bg-secondary hover:text-foreground"
+          className="flex flex-1 items-center gap-2 rounded-md px-2 py-1.5 text-xs text-sidebar-foreground hover:bg-secondary hover:text-foreground"
           aria-label="Settings"
         >
           <Settings className="h-3.5 w-3.5" />
           Settings
+        </button>
+        <button
+          onClick={toggleTheme}
+          className="rounded-md p-1.5 text-sidebar-foreground hover:bg-secondary hover:text-foreground"
+          aria-label={theme === "dark" ? "Switch to light mode" : "Switch to dark mode"}
+          title={theme === "dark" ? "Light mode" : "Dark mode"}
+        >
+          {theme === "dark" ? <Sun className="h-3.5 w-3.5" /> : <Moon className="h-3.5 w-3.5" />}
         </button>
       </div>
     </div>

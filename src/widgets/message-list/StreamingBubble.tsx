@@ -1,4 +1,6 @@
 import { useState, useCallback, useEffect } from "react";
+import remarkMath from "remark-math";
+import rehypeKatex from "rehype-katex";
 import { useStreamStore, type ActiveTurn } from "@/features/stream-response/stream-store";
 import { ThoughtToggle } from "./ThoughtToggle";
 import { mapSseError, type ErrorUiInfo } from "@/shared/lib/error-messages";
@@ -156,7 +158,7 @@ function ContentBlock({
       <div className="rounded-lg bg-card px-3.5 py-2.5">
         {turn.partialText && (
           <div className="prose prose-invert prose-sm max-w-none">
-            <Markdown remarkPlugins={[remarkGfm]} rehypePlugins={[rehypeHighlight]} components={markdownComponents} skipHtml={false}>
+            <Markdown remarkPlugins={[remarkGfm, remarkMath]} rehypePlugins={[rehypeHighlight, rehypeKatex]} components={markdownComponents} skipHtml={false}>
               {turn.partialText}
             </Markdown>
           </div>
@@ -180,7 +182,7 @@ function ContentBlock({
   return (
     <div className="rounded-lg bg-card px-3.5 py-2.5 text-sm leading-relaxed text-card-foreground">
       <div className="prose prose-invert prose-sm max-w-none">
-        <Markdown remarkPlugins={[remarkGfm]} rehypePlugins={[rehypeHighlight]} components={markdownComponents} skipHtml={false}>
+        <Markdown remarkPlugins={[remarkGfm, remarkMath]} rehypePlugins={[rehypeHighlight, rehypeKatex]} components={markdownComponents} skipHtml={false}>
           {turn.partialText}
         </Markdown>
       </div>
