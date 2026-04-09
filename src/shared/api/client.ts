@@ -64,7 +64,7 @@ export function applyServerUrl(serverUrl: string) {
       baseUrl:
         serverUrl ||
         import.meta.env.VITE_API_BASE_URL ||
-        "http://127.0.0.1:8087/cf/mini-chat",
+        "http://127.0.0.1:8087/mini-chat",
     });
   }
 }

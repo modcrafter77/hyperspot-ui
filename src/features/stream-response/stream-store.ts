@@ -5,6 +5,7 @@ import type {
   SseDone,
   SseError,
   CitationItem,
+  ThreadSummaryInfo,
 } from "./sse-types";
 
 export type ActiveTurn = {
@@ -20,6 +21,7 @@ export type ActiveTurn = {
   reasoning: string;
   reasoningStartedAt: number | null; // Date.now() when first reasoning delta arrives
   reasoningDurationMs: number | null; // Frozen when first text delta or stream ends
+  threadSummary: ThreadSummaryInfo | null;
 };
 
 type StreamState = {
@@ -29,7 +31,7 @@ type StreamState = {
 
 type StreamActions = {
   startTurn: (chatId: string, requestId: string) => AbortController;
-  onStreamStarted: (messageId: string) => void;
+  onStreamStarted: (messageId: string, threadSummary?: ThreadSummaryInfo) => void;
   onDelta: (content: string) => void;
   onReasoningDelta: (content: string) => void;
   onTool: (tool: SseTool) => void;
@@ -66,12 +68,13 @@ export const useStreamStore = create<StreamState & StreamActions>(
           reasoning: "",
           reasoningStartedAt: null,
           reasoningDurationMs: null,
+          threadSummary: null,
         },
       });
       return ac;
     },
 
-    onStreamStarted: (messageId) => {
+    onStreamStarted: (messageId, threadSummary) => {
       set((s) => {
         if (!s.activeTurn) return s;
         return {
@@ -79,6 +82,7 @@ export const useStreamStore = create<StreamState & StreamActions>(
             ...s.activeTurn,
             assistantMessageId: messageId,
             phase: "streaming",
+            threadSummary: threadSummary ?? null,
           },
         };
       });

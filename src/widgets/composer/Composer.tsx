@@ -13,10 +13,12 @@ import { useStreamStore } from "@/features/stream-response/stream-store";
 import { useAttachmentStore } from "@/features/attachments/attachment-store";
 import { AttachmentStrip } from "@/features/attachments/AttachmentStrip";
 import { toast } from "sonner";
+import type { ModelCapabilities } from "@/entities/model";
 
 type Props = {
   chatId: string;
   chatModel: string;
+  capabilities: ModelCapabilities;
   disabled?: boolean;
   quotaExhausted?: boolean;
   onSend: (
@@ -32,11 +34,14 @@ const MAX_IMAGE_PER_TURN = 4;
 export function Composer({
   chatId,
   chatModel,
+  capabilities,
   disabled,
   quotaExhausted,
   onSend,
   onCancel,
 }: Props) {
+  const canAttach = capabilities.supportsFiles || capabilities.supportsImages;
+  const canWebSearch = capabilities.supportsWebSearch;
   const [text, setText] = useState("");
   const [webSearch, setWebSearch] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
@@ -92,20 +97,41 @@ export function Composer({
         return;
       }
 
+      // Filter files based on model capabilities
+      const accepted: File[] = [];
+      for (const file of arr) {
+        const isImage = file.type.startsWith("image/");
+        if (isImage && !capabilities.supportsImages) {
+          toast.error("This model does not support image attachments");
+          continue;
+        }
+        if (!isImage && !capabilities.supportsFiles) {
+          toast.error("This model does not support file attachments");
+          continue;
+        }
+        accepted.push(file);
+      }
+      if (accepted.length === 0) return;
+
       const imageCount =
         attachments.filter((a) => a.kind === "image").length +
-        arr.filter((f) => f.type.startsWith("image/")).length;
+        accepted.filter((f) => f.type.startsWith("image/")).length;
       if (imageCount > MAX_IMAGE_PER_TURN) {
         toast.error(`Maximum ${MAX_IMAGE_PER_TURN} images per turn`);
         return;
       }
 
-      for (const file of arr) {
+      for (const file of accepted) {
         uploadFile(chatId, file);
       }
     },
-    [chatId, attachments, uploadFile],
+    [chatId, attachments, uploadFile, capabilities],
   );
+
+  // Reset web search if model doesn't support it
+  useEffect(() => {
+    if (!canWebSearch) setWebSearch(false);
+  }, [canWebSearch]);
 
   const handleSend = useCallback(() => {
     if (!canSend || busyRef.current) return;
@@ -161,6 +187,7 @@ export function Composer({
     e.preventDefault();
     dragCounter.current = 0;
     setIsDragging(false);
+    if (!canAttach) return;
     if (e.dataTransfer.files.length > 0) {
       addFiles(e.dataTransfer.files);
     }
@@ -208,9 +235,10 @@ export function Composer({
           <div className="flex items-end gap-2 px-3 py-2">
             <button
               onClick={handleFileSelect}
-              disabled={isStreaming}
+              disabled={isStreaming || !canAttach}
               className="mb-0.5 flex-shrink-0 rounded-md p-1.5 text-muted-foreground hover:bg-secondary hover:text-foreground disabled:opacity-40"
               aria-label="Attach file"
+              title={canAttach ? "Attach file" : "This model does not support attachments"}
             >
               <Paperclip className="h-4 w-4" />
             </button>
@@ -219,6 +247,11 @@ export function Composer({
               ref={fileInputRef}
               type="file"
               multiple
+              accept={
+                capabilities.supportsImages && !capabilities.supportsFiles
+                  ? "image/png,image/jpeg,image/webp"
+                  : undefined
+              }
               className="hidden"
               onChange={handleFileInputChange}
             />
@@ -240,14 +273,17 @@ export function Composer({
             <div className="mb-0.5 flex flex-shrink-0 items-center gap-1">
               <button
                 onClick={() => setWebSearch((v) => !v)}
+                disabled={!canWebSearch}
                 className={cn(
                   "rounded-md p-1.5 transition-colors",
-                  webSearch
-                    ? "bg-primary/20 text-primary"
-                    : "text-muted-foreground hover:bg-secondary hover:text-foreground",
+                  !canWebSearch
+                    ? "text-muted-foreground opacity-40"
+                    : webSearch
+                      ? "bg-primary/20 text-primary"
+                      : "text-muted-foreground hover:bg-secondary hover:text-foreground",
                 )}
                 aria-label="Web search"
-                title={webSearch ? "Web search enabled" : "Enable web search"}
+                title={canWebSearch ? (webSearch ? "Web search enabled" : "Enable web search") : "This model does not support web search"}
               >
                 <Globe className="h-4 w-4" />
               </button>
