@@ -1,6 +1,17 @@
 import type { components } from "@/shared/api";
 
-export type SseStreamStarted = components["schemas"]["SseStreamStartedEvent"];
+/** Thread summary metadata sent when the backend compresses older messages. */
+export type ThreadSummaryInfo = {
+  token_estimate: number;
+  messages_compressed?: number;
+  frontier_message_id?: string;
+  summary_updated_at?: string;
+};
+
+// Override: backend sends thread_summary_applied which isn't in the generated schema yet.
+export type SseStreamStarted = components["schemas"]["SseStreamStartedEvent"] & {
+  thread_summary_applied?: ThreadSummaryInfo;
+};
 // Override: backend now sends type "text" | "reasoning"; schema only defines "text"
 export type SseDelta = { type: "text" | "reasoning"; content: string };
 export type SseCitations = components["schemas"]["SseCitationsEvent"];

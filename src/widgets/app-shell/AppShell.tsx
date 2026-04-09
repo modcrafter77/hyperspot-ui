@@ -8,6 +8,7 @@ import { NewChatPane } from "@/widgets/new-chat/NewChatPane";
 import { CommandPalette } from "@/widgets/command-palette/CommandPalette";
 import { ChatHeader } from "@/widgets/chat-header/ChatHeader";
 import { useChatDetailSafe } from "@/entities/chat";
+import { useModels, getModelCapabilities } from "@/entities/model";
 import { useIsQuotaExhausted } from "@/entities/quota";
 import { useSendMessage } from "@/features/send-message/useSendMessage";
 import { useWindowTitle } from "@/shared/hooks/useWindowTitle";
@@ -149,6 +150,9 @@ function ChatPane({ chatId }: { chatId: string }) {
   const { data: chat, isLoading } = useChatDetailSafe(chatId);
   const { send, cancel } = useSendMessage(chatId);
   const quotaExhausted = useIsQuotaExhausted();
+  const { data: modelList } = useModels();
+  const model = modelList?.items.find((m) => m.model_id === chat?.model);
+  const capabilities = getModelCapabilities(model);
 
   useWindowTitle(chat?.title);
 
@@ -164,6 +168,7 @@ function ChatPane({ chatId }: { chatId: string }) {
       <Composer
         chatId={chatId}
         chatModel={chat?.model ?? ""}
+        capabilities={capabilities}
         disabled={quotaExhausted}
         quotaExhausted={quotaExhausted}
         onSend={send}
