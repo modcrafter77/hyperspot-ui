@@ -23,7 +23,7 @@ export default defineConfig({
       "/v1": {
         target: "http://127.0.0.1:8087",
         changeOrigin: true,
-        rewrite: (path) => `/cf/mini-chat${path}`,
+        rewrite: (path) => `/mini-chat${path}`,
       },
     },
   },

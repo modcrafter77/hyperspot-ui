@@ -2,7 +2,9 @@ import { useCallback, useRef, useEffect, useMemo } from "react";
 import { useMessagesInfinite } from "@/entities/message";
 import { MessageBubble } from "./MessageBubble";
 import { StreamingBubble } from "./StreamingBubble";
+import { ThreadSummaryBanner } from "./ThreadSummaryBanner";
 import { useStreamStore } from "@/features/stream-response/stream-store";
+import { useSummaryStore } from "@/features/stream-response/summary-store";
 import { useTurnActions } from "@/features/turn-actions/useTurnActions";
 import { useReaction } from "@/features/turn-actions/useReaction";
 import { Loader2 } from "lucide-react";
@@ -30,6 +32,7 @@ export function ChatView({ chatId }: Props) {
 
   const { handleRetry, handleEdit, handleDelete } = useTurnActions(chatId);
   const { toggleReaction } = useReaction(chatId);
+  const threadSummary = useSummaryStore((s) => s.entries[chatId]);
 
   const scrollRef = useRef<HTMLDivElement>(null);
   const stickRef = useRef(true);
@@ -140,6 +143,9 @@ export function ChatView({ chatId }: Props) {
       )}
 
       <div role="log" aria-live="polite" className="mx-auto w-full max-w-3xl space-y-1 px-4 py-4">
+        {threadSummary && !hasNextPage && (
+          <ThreadSummaryBanner summary={threadSummary} />
+        )}
         {messages.map((msg) => (
           <MessageBubble
             key={msg.id}

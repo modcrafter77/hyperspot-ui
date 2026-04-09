@@ -5,6 +5,7 @@ import rehypeHighlight from "rehype-highlight";
 import rehypeKatex from "rehype-katex";
 import { useStreamStore, type ActiveTurn } from "@/features/stream-response/stream-store";
 import { ThoughtToggle } from "./ThoughtToggle";
+import { ThreadSummaryBanner } from "./ThreadSummaryBanner";
 import { mapSseError, type ErrorUiInfo } from "@/shared/lib/error-messages";
 import { cn } from "@/shared/lib/cn";
 import {
@@ -38,24 +39,27 @@ export function StreamingBubble({ chatId, onRetry }: Props) {
   if (turn.phase === "idle") return null;
 
   return (
-    <div className="flex gap-3 py-3">
-      <div className="flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-full bg-muted text-muted-foreground">
-        <Bot className="h-3.5 w-3.5" />
+    <>
+      {turn.threadSummary && <ThreadSummaryBanner summary={turn.threadSummary} />}
+      <div className="flex gap-3 py-3">
+        <div className="flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-full bg-muted text-muted-foreground">
+          <Bot className="h-3.5 w-3.5" />
+        </div>
+        <div className="group min-w-0 max-w-[85%] space-y-2">
+          <ToolIndicators turn={turn} />
+          <ThinkingBadge turn={turn} />
+          <ContentBlock turn={turn} onRetry={onRetry} />
+          {turn.phase === "cancelled" && (
+            <span className="text-[11px] text-muted-foreground">
+              Generation cancelled
+            </span>
+          )}
+          {turn.partialText && (turn.phase === "done" || turn.phase === "cancelled") && (
+            <CopyBtn text={turn.partialText} />
+          )}
+        </div>
       </div>
-      <div className="group min-w-0 max-w-[85%] space-y-2">
-        <ToolIndicators turn={turn} />
-        <ThinkingBadge turn={turn} />
-        <ContentBlock turn={turn} onRetry={onRetry} />
-        {turn.phase === "cancelled" && (
-          <span className="text-[11px] text-muted-foreground">
-            Generation cancelled
-          </span>
-        )}
-        {turn.partialText && (turn.phase === "done" || turn.phase === "cancelled") && (
-          <CopyBtn text={turn.partialText} />
-        )}
-      </div>
-    </div>
+    </>
   );
 }
 
@@ -273,4 +277,5 @@ function ErrorBlock({
     </div>
   );
 }
+
 

@@ -3,6 +3,7 @@ import { appFetch } from "@/shared/lib/fetch";
 import { parseSseStream } from "./sse-parser";
 import { useStreamStore } from "./stream-store";
 import { useReasoningStore } from "./reasoning-store";
+import { useSummaryStore } from "./summary-store";
 import { mapSseError } from "@/shared/lib/error-messages";
 import { trackError } from "@/shared/lib/telemetry";
 import type { components } from "@/shared/api";
@@ -56,9 +57,15 @@ async function runSseStream(
       const s = useStreamStore.getState();
 
       switch (event.type) {
-        case "stream_started":
-          s.onStreamStarted(event.data.message_id);
+        case "stream_started": {
+          s.onStreamStarted(event.data.message_id, event.data.thread_summary_applied);
+          // Persist thread summary per-chat for subsequent views
+          const chatId = useStreamStore.getState().activeTurn?.chatId;
+          if (chatId && event.data.thread_summary_applied) {
+            useSummaryStore.getState().set(chatId, event.data.thread_summary_applied);
+          }
           break;
+        }
         case "ping":
           break;
         case "delta":

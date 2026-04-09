@@ -8,7 +8,7 @@ import {
 import { useQueryClient } from "@tanstack/react-query";
 import { useAppStore } from "@/app/store";
 import { createChat } from "@/entities/chat/api";
-import { useModels } from "@/entities/model";
+import { useModels, getModelCapabilities } from "@/entities/model";
 import { useIsQuotaExhausted } from "@/entities/quota";
 
 import { queryKeys } from "@/shared/lib/query-keys";
@@ -25,6 +25,9 @@ import {
   Zap,
   ChevronDown,
   Loader2,
+  ImageIcon,
+  FileText,
+  Search,
 } from "lucide-react";
 import type { Model } from "@/entities/model";
 
@@ -52,7 +55,13 @@ export function NewChatPane() {
   const busyRef = useRef(false);
 
   const currentModel = models.find((m) => m.model_id === selectedModel);
+  const capabilities = getModelCapabilities(currentModel);
   const canSend = text.trim().length > 0 && !sending && !quotaExhausted;
+
+  // Reset web search when switching to a model without support
+  useEffect(() => {
+    if (!capabilities.supportsWebSearch) setWebSearch(false);
+  }, [capabilities.supportsWebSearch]);
 
   const handleSend = useCallback(async () => {
     if (!canSend || busyRef.current) return;
@@ -130,14 +139,17 @@ export function NewChatPane() {
               <div className="mb-0.5 flex flex-shrink-0 items-center gap-1">
                 <button
                   onClick={() => setWebSearch((v) => !v)}
+                  disabled={!capabilities.supportsWebSearch}
                   className={cn(
                     "rounded-md p-1.5 transition-colors",
-                    webSearch
-                      ? "bg-primary/20 text-primary"
-                      : "text-muted-foreground hover:bg-secondary hover:text-foreground",
+                    !capabilities.supportsWebSearch
+                      ? "text-muted-foreground opacity-40"
+                      : webSearch
+                        ? "bg-primary/20 text-primary"
+                        : "text-muted-foreground hover:bg-secondary hover:text-foreground",
                   )}
                   aria-label="Web search"
-                  title={webSearch ? "Web search enabled" : "Enable web search"}
+                  title={capabilities.supportsWebSearch ? (webSearch ? "Web search enabled" : "Enable web search") : "This model does not support web search"}
                 >
                   <Globe className="h-4 w-4" />
                 </button>
@@ -248,10 +260,29 @@ function ModelDropdown({
           >
             <TierIcon tier={m.tier} />
             <div className="min-w-0 flex-1">
-              <span className="font-medium">{m.display_name}</span>
-              <span className="ml-1.5 text-[11px] text-muted-foreground">
-                {m.multiplier_display}
-              </span>
+              <div className="flex items-center gap-1">
+                <span className="font-medium">{m.display_name}</span>
+                <span className="ml-1 text-[11px] text-muted-foreground">
+                  {m.multiplier_display}
+                </span>
+              </div>
+              <div className="flex items-center gap-1.5 mt-0.5">
+                {m.multimodal_capabilities.includes("VISION_INPUT") && (
+                  <span className="flex items-center gap-0.5 text-[10px] text-muted-foreground" title="Supports images">
+                    <ImageIcon className="h-2.5 w-2.5" />
+                  </span>
+                )}
+                {m.multimodal_capabilities.includes("RAG") && (
+                  <span className="flex items-center gap-0.5 text-[10px] text-muted-foreground" title="Supports file attachments">
+                    <FileText className="h-2.5 w-2.5" />
+                  </span>
+                )}
+                {m.multimodal_capabilities.includes("WEB_SEARCH") && (
+                  <span className="flex items-center gap-0.5 text-[10px] text-muted-foreground" title="Supports web search">
+                    <Search className="h-2.5 w-2.5" />
+                  </span>
+                )}
+              </div>
             </div>
           </button>
         ))}
